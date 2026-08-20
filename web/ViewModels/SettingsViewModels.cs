@@ -29,6 +29,7 @@ namespace web.ViewModels
         public bool IsActive { get; set; }
         public List<string> Roles { get; set; } = new();
         public DateTime CreatedAtUtc { get; set; }
+        public string PreferredLanguage { get; set; } = AppLanguages.Default;
     }
 
     public class UserFilterViewModel
@@ -64,6 +65,10 @@ namespace web.ViewModels
 
         [Required]
         public string Role { get; set; } = AppRoles.User;
+
+        [Required(ErrorMessage = "Foretrukket sprog er påkrævet")]
+        [Display(Name = "Foretrukket sprog")]
+        public string PreferredLanguage { get; set; } = AppLanguages.Default;
     }
 
     public class EditUserViewModel
@@ -91,6 +96,10 @@ namespace web.ViewModels
         [StringLength(100, ErrorMessage = "Password må ikke være længere end 100 tegn")]
         [DataType(DataType.Password)]
         public string? Password { get; set; }
+
+        [Required(ErrorMessage = "Foretrukket sprog er påkrævet")]
+        [Display(Name = "Foretrukket sprog")]
+        public string PreferredLanguage { get; set; } = AppLanguages.Default;
     }
 
     public class RegistrationSettingsViewModel

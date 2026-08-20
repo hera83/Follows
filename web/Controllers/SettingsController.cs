@@ -320,7 +320,8 @@ namespace web.Controllers
                 PhoneNumber = string.IsNullOrWhiteSpace(model.PhoneNumber) ? null : model.PhoneNumber,
                 IsActive = true,
                 EmailConfirmed = true,
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = DateTime.UtcNow,
+                PreferredLanguage = AppLanguages.Normalize(model.PreferredLanguage)
             };
 
             var result = await _userManager.CreateAsync(user, model.Password);
@@ -350,6 +351,7 @@ namespace web.Controllers
             user.DisplayName = model.DisplayName;
             user.PhoneNumber = string.IsNullOrWhiteSpace(model.PhoneNumber) ? null : model.PhoneNumber;
             user.IsActive = model.IsActive;
+            user.PreferredLanguage = AppLanguages.Normalize(model.PreferredLanguage);
             user.UpdatedAtUtc = DateTime.UtcNow;
 
             var result = await _userManager.UpdateAsync(user);
@@ -834,7 +836,8 @@ namespace web.Controllers
                     PhoneNumber = user.PhoneNumber,
                     IsActive = user.IsActive,
                     CreatedAtUtc = user.CreatedAtUtc,
-                    Roles = roles.ToList()
+                    Roles = roles.ToList(),
+                    PreferredLanguage = user.PreferredLanguage
                 });
             }
 

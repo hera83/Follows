@@ -29,13 +29,31 @@ services:
       Mail__Imap__Username: ${MAIL_IMAP_USERNAME:-}
       Mail__Imap__Password: ${MAIL_IMAP_PASSWORD:-}
 
-      # Optional integrations - leave blank to keep them disabled
-      Ollama__BaseUrl: ${OLLAMA_BASE_URL:-}
-      Ollama__ApiKey: ${OLLAMA_API_KEY:-}
+      # AI Gateway - leave blank to keep it disabled
       AiGateway__BaseUrl: ${AI_GATEWAY_BASE_URL:-}
       AiGateway__ApiKey: ${AI_GATEWAY_API_KEY:-}
+      AiGateway__DefaultChatModel: ${AI_GATEWAY_DEFAULT_CHAT_MODEL:-}
+      AiGateway__DefaultLanguage: ${AI_GATEWAY_DEFAULT_LANGUAGE:-Dansk}
+      AiGateway__DefaultTtsModel: ${AI_GATEWAY_DEFAULT_TTS_MODEL:-}
+      AiGateway__DefaultTtsVoice: ${AI_GATEWAY_DEFAULT_TTS_VOICE:-}
+      AiGateway__DefaultSttModel: ${AI_GATEWAY_DEFAULT_STT_MODEL:-}
+      AiGateway__RequestTimeoutSeconds: ${AI_GATEWAY_REQUEST_TIMEOUT_SECONDS:-600}
+
+      # Ollama - leave blank to keep it disabled
+      Ollama__BaseUrl: ${OLLAMA_BASE_URL:-}
+      Ollama__ApiKey: ${OLLAMA_API_KEY:-}
+      Ollama__DefaultChatModel: ${OLLAMA_DEFAULT_CHAT_MODEL:-}
+      Ollama__DefaultGenerateModel: ${OLLAMA_DEFAULT_GENERATE_MODEL:-}
+      Ollama__DefaultEmbeddingModel: ${OLLAMA_DEFAULT_EMBEDDING_MODEL:-}
+      Ollama__DefaultKeepAlive: ${OLLAMA_DEFAULT_KEEP_ALIVE:-}
+      Ollama__DefaultLanguage: ${OLLAMA_DEFAULT_LANGUAGE:-Dansk}
+      Ollama__UseStreamingByDefault: ${OLLAMA_USE_STREAMING_BY_DEFAULT:-false}
+      Ollama__RequestTimeoutSeconds: ${OLLAMA_REQUEST_TIMEOUT_SECONDS:-600}
+
+      # SMS - leave blank to keep it disabled
       Sms__BaseUrl: ${SMS_BASE_URL:-}
       Sms__ApiKey: ${SMS_API_KEY:-}
+      Sms__WorkerIntervalSeconds: ${SMS_WORKER_INTERVAL_SECONDS:-30}
     volumes:
       # Named volumes: Docker seeds them from /app/App_dbs and /app/App_files
       # in the image on first start, which preserves the non-root "app" user

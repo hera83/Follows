@@ -48,6 +48,7 @@
                                 <button class="btn btn-sm btn-secondary" type="button" data-bs-toggle="modal" data-bs-target="#editUserModal"
                                         data-id="@user.Id" data-email="@user.Email" data-displayname="@user.DisplayName"
                                         data-phonenumber="@user.PhoneNumber" data-isactive="@user.IsActive.ToString().ToLowerInvariant()" data-role="@role"
+                                        data-preferredlanguage="@user.PreferredLanguage"
                                         disabled="@isSelf"
                                         title="@(isSelf ? "Brug 'Min profil' for at redigere din egen bruger" : "Rediger")" aria-label="Rediger">
                                     <i class="bi bi-pencil"></i>
