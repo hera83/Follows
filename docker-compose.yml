@@ -1,0 +1,57 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: follows-web:latest
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+
+      # AppSettings (see web/appsettings.json for the full key list)
+      AppSettings__SiteName: ${SITE_NAME:-Follows}
+      AppSettings__AllowPublicRegistration: ${ALLOW_PUBLIC_REGISTRATION:-false}
+      AppSettings__DefaultThemeMode: ${DEFAULT_THEME_MODE:-System}
+
+      # Mail (SMTP/IMAP) - leave blank to keep mail features disabled
+      Mail__Smtp__Host: ${MAIL_SMTP_HOST:-}
+      Mail__Smtp__Port: ${MAIL_SMTP_PORT:-587}
+      Mail__Smtp__SecureSocketOptions: ${MAIL_SMTP_SECURE:-StartTls}
+      Mail__Smtp__Username: ${MAIL_SMTP_USERNAME:-}
+      Mail__Smtp__Password: ${MAIL_SMTP_PASSWORD:-}
+      Mail__Smtp__FromAddress: ${MAIL_SMTP_FROM_ADDRESS:-}
+      Mail__Smtp__FromName: ${MAIL_SMTP_FROM_NAME:-}
+      Mail__Imap__Host: ${MAIL_IMAP_HOST:-}
+      Mail__Imap__Port: ${MAIL_IMAP_PORT:-993}
+      Mail__Imap__SecureSocketOptions: ${MAIL_IMAP_SECURE:-SslOnConnect}
+      Mail__Imap__Username: ${MAIL_IMAP_USERNAME:-}
+      Mail__Imap__Password: ${MAIL_IMAP_PASSWORD:-}
+
+      # Optional integrations - leave blank to keep them disabled
+      Ollama__BaseUrl: ${OLLAMA_BASE_URL:-}
+      Ollama__ApiKey: ${OLLAMA_API_KEY:-}
+      AiGateway__BaseUrl: ${AI_GATEWAY_BASE_URL:-}
+      AiGateway__ApiKey: ${AI_GATEWAY_API_KEY:-}
+      Sms__BaseUrl: ${SMS_BASE_URL:-}
+      Sms__ApiKey: ${SMS_API_KEY:-}
+    volumes:
+      # Named volumes: Docker seeds them from /app/App_dbs and /app/App_files
+      # in the image on first start, which preserves the non-root "app" user
+      # ownership set in the Dockerfile. Prefer these over bind mounts unless
+      # you specifically need direct host filesystem access (in which case
+      # remember to chown the host folders to match the container's "app"
+      # user, e.g. `docker compose exec web id app`).
+      - app_dbs:/app/App_dbs
+      - app_files:/app/App_files
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/Account/Login"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  app_dbs:
+  app_files:

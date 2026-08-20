@@ -4,6 +4,9 @@ web/App_files/
 
 ## Lokale secrets (indeholder rigtige API-keys/passwords, må aldrig committes)
 web/appsettings.Development.json
+.env
+.env.*
+!.env.example
 .vs/
 .claude/
 .git/

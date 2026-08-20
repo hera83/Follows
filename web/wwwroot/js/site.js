@@ -10,12 +10,64 @@
 
     applySidebarDefault();
 
+    // ─── Mobile drawer ───────────────────────────────────────────────────────
+    // Separate from the desktop collapsed/expanded state below: on phones the
+    // sidebar is an off-canvas drawer that starts closed and is opened via the
+    // hamburger button, not the (desktop-only) collapse toggle.
+    const mobileToggle = document.getElementById('mobileMenuToggle');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    const mobileQuery = window.matchMedia('(max-width: 768px)');
+
+    const mobileToggleIcon = mobileToggle?.querySelector('i');
+
+    const closeMobileDrawer = () => {
+        if (!shell) return;
+        shell.classList.remove('sidebar-mobile-open');
+        mobileToggle?.setAttribute('aria-expanded', 'false');
+        mobileToggle?.setAttribute('aria-label', 'Åbn menu');
+        mobileToggleIcon?.classList.replace('bi-x-lg', 'bi-list');
+    };
+
+    const openMobileDrawer = () => {
+        if (!shell) return;
+        shell.classList.add('sidebar-mobile-open');
+        mobileToggle?.setAttribute('aria-expanded', 'true');
+        mobileToggle?.setAttribute('aria-label', 'Luk menu');
+        mobileToggleIcon?.classList.replace('bi-list', 'bi-x-lg');
+    };
+
     if (toggle && shell) {
         toggle.addEventListener('click', () => {
+            if (mobileQuery.matches) {
+                closeMobileDrawer();
+                return;
+            }
             shell.classList.toggle('sidebar-collapsed');
             localStorage.setItem('sidebar-collapsed', shell.classList.contains('sidebar-collapsed').toString());
         });
     }
+
+    if (mobileToggle && shell) {
+        mobileToggle.addEventListener('click', () => {
+            shell.classList.contains('sidebar-mobile-open') ? closeMobileDrawer() : openMobileDrawer();
+        });
+    }
+
+    backdrop?.addEventListener('click', closeMobileDrawer);
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeMobileDrawer();
+    });
+
+    // Close the drawer after picking a menu item, and whenever a resize
+    // crosses back over the desktop breakpoint (avoids a stuck-open drawer).
+    document.querySelectorAll('.side-menu .menu-item').forEach((item) => {
+        item.addEventListener('click', closeMobileDrawer);
+    });
+
+    mobileQuery.addEventListener('change', (e) => {
+        if (!e.matches) closeMobileDrawer();
+    });
 
     // ─── Toasts ───────────────────────────────────────────────────────────────
     const initToasts = (container) => {

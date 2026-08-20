@@ -465,13 +465,72 @@ a:hover { color: #58a6ff; text-decoration: underline; }
   margin-left: var(--sb-closed);
 }
 
+/* ── Mobile hamburger trigger (hidden on desktop) ── */
+.mobile-menu-toggle {
+  display: none;
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 210;
+  width: 2.5rem;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-md);
+  background: var(--clr-surface);
+  color: var(--clr-text);
+  font-size: 1.25rem;
+  box-shadow: var(--shadow-card);
+}
+
+/* ── Backdrop behind the open mobile drawer ── */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 199;
+  background: rgba(0,0,0,.5);
+}
+
 /* ── Mobile ── */
 @media (max-width: 768px) {
+  .mobile-menu-toggle { display: flex; }
+
+  /* Sidebar becomes a full off-canvas drawer, independent of the
+     desktop collapsed/expanded state (which only applies >768px). */
   .side-menu,
-  .app-shell.sidebar-collapsed .side-menu { width: var(--sb-closed); }
+  .app-shell.sidebar-collapsed .side-menu {
+    width: var(--sb-open);
+    transform: translateX(-100%);
+    transition: transform var(--sb-speed) var(--sb-ease);
+    box-shadow: 0 0 28px rgba(0,0,0,.4);
+  }
+  .app-shell.sidebar-mobile-open .side-menu {
+    transform: translateX(0);
+  }
+  .app-shell.sidebar-mobile-open .sidebar-backdrop {
+    display: block;
+  }
+
+  /* Drawer always shows full labels — there's no room for an
+     icon-only rail on a phone, and the toggle above opens/closes it. */
+  .menu-text,
+  .app-shell.sidebar-collapsed .menu-text { opacity: 1; max-width: 200px; pointer-events: auto; }
+  .app-shell.sidebar-collapsed .menu-item { justify-content: flex-start; gap: 0.75rem; }
+  .menu-item { min-height: 46px; }
+
   .app-content,
-  .app-shell.sidebar-collapsed .app-content { margin-left: var(--sb-closed); padding: 1rem; }
-  .menu-text { opacity: 0; max-width: 0; pointer-events: none; }
+  .app-shell.sidebar-collapsed .app-content {
+    margin-left: 0;
+    padding: 1rem;
+    padding-top: 4rem;
+  }
+}
+
+@media (max-width: 480px) {
+  #toast-container { top: 0.75rem; left: 0.75rem; right: 0.75rem; }
+  .fv-toast { min-width: 0; max-width: none; width: 100%; }
 }
 
 /* ════════════════════════════════════════

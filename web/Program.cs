@@ -1,6 +1,7 @@
 using Serilog;
 using Serilog.Events;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using web.Data;
 using web.Data.Entities;
@@ -148,6 +149,19 @@ try
         // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
         app.UseHsts();
     }
+
+    // Trust X-Forwarded-* headers from the reverse proxy (Nginx/Traefik/Caddy)
+    // that terminates TLS in front of the container, so UseHttpsRedirection,
+    // secure cookies etc. see the original scheme/client IP correctly. Known
+    // networks/proxies are cleared because the proxy's address isn't fixed in
+    // a container/orchestrator setup.
+    var forwardedHeadersOptions = new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+    };
+    forwardedHeadersOptions.KnownIPNetworks.Clear();
+    forwardedHeadersOptions.KnownProxies.Clear();
+    app.UseForwardedHeaders(forwardedHeadersOptions);
 
     app.UseHttpsRedirection();
     app.UseRouting();
