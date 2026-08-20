@@ -14,6 +14,9 @@ namespace web.ViewModels
         public string CurrentUserDisplayName { get; set; } = string.Empty;
         public bool CurrentUserHasAvatar { get; set; }
 
+        /// <summary>True for Administrator/Developer — controls whether the shared edit modal renders its date field.</summary>
+        public bool CurrentUserIsModerator { get; set; }
+
         /// <summary>"Oversætter {0} opslag..." (or the viewer's own language) for the top progress banner.</summary>
         public string TranslatingBannerFormat { get; set; } = string.Empty;
 
@@ -58,6 +61,12 @@ namespace web.ViewModels
 
         /// <summary>True when the current user is the author, or an admin/developer.</summary>
         public bool CanDelete { get; set; }
+
+        /// <summary>True when the current user is the author, or an admin/developer — same rule as CanDelete.</summary>
+        public bool CanEdit { get; set; }
+
+        /// <summary>True (only for Administrator/Developer) when the edit modal should also offer a date field.</summary>
+        public bool CanEditDate { get; set; }
     }
 
     public class FeedMediaViewModel
@@ -105,5 +114,24 @@ namespace web.ViewModels
         [Required(ErrorMessage = "Skriv en kommentar.")]
         [MaxLength(FeedLimits.MaxCommentLength, ErrorMessage = "Kommentaren må højst være 1000 tegn.")]
         public string Body { get; set; } = string.Empty;
+    }
+
+    /// <summary>Bound from the edit-post modal form. CreatedAtUtc is only honored server-side for Administrator/Developer.</summary>
+    public class EditFeedPostViewModel
+    {
+        [Required]
+        public int PostId { get; set; }
+
+        [MaxLength(FeedLimits.MaxCaptionLength, ErrorMessage = "Historien må højst være 4000 tegn.")]
+        public string? Caption { get; set; }
+
+        /// <summary>
+        /// Sent as an ISO 8601 string with a "Z"/offset (the client converts its local datetime-local
+        /// input before posting) — bound as DateTimeOffset, not DateTime, because the default MVC
+        /// DateTime binder silently converts a "Z"-suffixed string to local time instead of keeping it
+        /// as UTC, which would shift the stored timestamp by the server's UTC offset. Ignored unless
+        /// the caller is Administrator/Developer.
+        /// </summary>
+        public DateTimeOffset? CreatedAtUtc { get; set; }
     }
 }

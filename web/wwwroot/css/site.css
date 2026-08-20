@@ -1909,6 +1909,14 @@ p.feed-translated { padding: .5rem .75rem; }
 }
 .doc-back-link:hover { color: var(--clr-text); }
 
+.doc-title-link {
+  color: var(--clr-text);
+  font-weight: 500;
+  text-decoration: none;
+  vertical-align: baseline;
+}
+.doc-title-link:hover, .doc-title-link:focus { color: var(--clr-brand); text-decoration: underline; }
+
 .doc-empty {
   text-align: center;
   padding: 3.5rem 1.5rem;

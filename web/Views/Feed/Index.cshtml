@@ -87,6 +87,39 @@
     </div>
 </div>
 
+<!-- Rediger opslag -->
+<div class="modal fade" id="feedEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="feedEditForm">
+                <div class="modal-header">
+                    <h1 class="modal-title fs-5"><i class="bi bi-pencil me-2"></i>Rediger opslag</h1>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="feedEditPostId" />
+                    <div class="mb-3">
+                        <label for="feedEditCaption" class="form-label">Historie</label>
+                        <textarea id="feedEditCaption" class="form-control" rows="4" maxlength="@FeedLimits.MaxCaptionLength"></textarea>
+                    </div>
+                    @if (Model.CurrentUserIsModerator)
+                    {
+                        <div class="mb-3" id="feedEditDateWrap">
+                            <label for="feedEditDate" class="form-label">Dato og tidspunkt</label>
+                            <input type="datetime-local" id="feedEditDate" class="form-control" />
+                            <div class="form-text">Kun admin/udvikler kan rette datoen — brug det til at lægge gamle begivenheder ind på deres rigtige plads i tidslinjen.</div>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Annuller</button>
+                    <button type="submit" class="btn btn-primary" id="feedEditSaveBtn"><i class="bi bi-floppy me-1"></i>Gem</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Lightbox -->
 <div class="feed-lightbox" id="feedLightbox" aria-hidden="true">
     <button type="button" class="feed-lightbox-close" id="feedLightboxClose" aria-label="Luk"><i class="bi bi-x-lg"></i></button>
@@ -624,6 +657,79 @@
                 }
             });
 
+            // ─── Edit post modal ─────────────────────────────────────────────────
+            const editModalEl = document.getElementById('feedEditModal');
+            const bsEditModal = new bootstrap.Modal(editModalEl);
+            const editForm = document.getElementById('feedEditForm');
+            const editPostIdEl = document.getElementById('feedEditPostId');
+            const editCaptionEl = document.getElementById('feedEditCaption');
+            const editDateEl = document.getElementById('feedEditDate');
+            const editSaveBtn = document.getElementById('feedEditSaveBtn');
+
+            // datetime-local wants/gives local time with no timezone info — format an ISO UTC string
+            // down to "YYYY-MM-DDTHH:mm" in the browser's local time for the input's initial value.
+            const toLocalDatetimeValue = (isoUtc) => {
+                const d = new Date(isoUtc);
+                const pad = (n) => String(n).padStart(2, '0');
+                return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            };
+
+            const openEditModal = async (postId) => {
+                const res = await fetch(`/Feed/EditPostData/${postId}`, { headers: { 'X-Requested-With': 'fetch' } });
+                const data = await res.json();
+                if (!data.success) {
+                    window.FvToast.show(data.type || 'error', data.message || 'Opslaget kunne ikke hentes.');
+                    return;
+                }
+
+                editPostIdEl.value = data.postId;
+                editCaptionEl.value = data.caption || '';
+                if (editDateEl) {
+                    if (data.canEditDate) {
+                        editDateEl.disabled = false;
+                        editDateEl.value = toLocalDatetimeValue(data.createdAtUtc);
+                    } else {
+                        editDateEl.disabled = true;
+                    }
+                }
+                bsEditModal.show();
+            };
+
+            editForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                editSaveBtn.disabled = true;
+                try {
+                    const fd = new FormData();
+                    fd.set('__RequestVerificationToken', csrfToken);
+                    fd.set('PostId', editPostIdEl.value);
+                    fd.set('Caption', editCaptionEl.value);
+                    if (editDateEl && !editDateEl.disabled && editDateEl.value) {
+                        // The input holds local time with no offset — reinterpret it as local via
+                        // `new Date(...)`, then send it as a proper UTC ISO string.
+                        fd.set('CreatedAtUtc', new Date(editDateEl.value).toISOString());
+                    }
+
+                    const res = await fetch('/Feed/EditPost', { method: 'POST', body: fd, headers: { 'X-Requested-With': 'fetch' } });
+                    const data = await res.json();
+                    window.FvToast.show(data.type || (data.success ? 'success' : 'error'), data.message);
+                    if (data.success) {
+                        bsEditModal.hide();
+                        if (data.dateChanged) {
+                            // The feed sorts by date — a changed date can move this post anywhere in
+                            // the (cursor-paginated) timeline, which a single in-place card swap can't
+                            // express. Reloading is the simple, correct way to show it in its new spot.
+                            location.reload();
+                        } else {
+                            await refreshPost(data.postId);
+                        }
+                    }
+                } catch {
+                    window.FvToast.show('error', 'Netværksfejl. Prøv igen.');
+                } finally {
+                    editSaveBtn.disabled = false;
+                }
+            });
+
             // ─── Delegated events on the feed list (survives dynamic updates) ──
             feedList.addEventListener('click', (e) => {
                 const mediaBtn = e.target.closest('.feed-media-item');
@@ -631,6 +737,9 @@
 
                 const likeBtn = e.target.closest('.feed-like-btn');
                 if (likeBtn) { toggleLike(likeBtn); return; }
+
+                const editPostBtn = e.target.closest('.feed-edit-post');
+                if (editPostBtn) { openEditModal(editPostBtn.dataset.postId); return; }
 
                 const deletePostBtn = e.target.closest('.feed-delete-post');
                 if (deletePostBtn) { confirmDelete('post', deletePostBtn.dataset.postId); return; }

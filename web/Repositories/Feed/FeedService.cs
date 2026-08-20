@@ -41,13 +41,34 @@ namespace web.Repositories.Feed
 
             var query = _context.FeedPosts
                 .AsNoTracking()
-                .OrderByDescending(p => p.Id)
                 .AsQueryable();
 
             if (dto.BeforeId.HasValue)
-                query = query.Where(p => p.Id < dto.BeforeId.Value);
+            {
+                // The timeline sorts by CreatedAtUtc (Administrator/Developer can backdate a post, e.g.
+                // to add an old event, and it must then sort into its real place, not stay pinned to
+                // the top by insertion order) with Id as a tiebreaker for posts sharing a timestamp.
+                // Paging "before" that ordering therefore needs the anchor post's own CreatedAtUtc, not
+                // just its Id.
+                var anchor = await _context.FeedPosts
+                    .AsNoTracking()
+                    .Where(p => p.Id == dto.BeforeId.Value)
+                    .Select(p => new { p.CreatedAtUtc, p.Id })
+                    .FirstOrDefaultAsync(ct);
+
+                // The anchor post was deleted since the caller last saw it — there's no reliable way to
+                // tell what came "after" it any more, so stop paging rather than risk re-showing posts
+                // already rendered on the client.
+                if (anchor is null)
+                    return new GetFeedPageResponseDto { Posts = new List<FeedPostDto>(), HasMore = false };
+
+                query = query.Where(p =>
+                    p.CreatedAtUtc < anchor.CreatedAtUtc ||
+                    (p.CreatedAtUtc == anchor.CreatedAtUtc && p.Id < anchor.Id));
+            }
 
             var posts = await query
+                .OrderByDescending(p => p.CreatedAtUtc).ThenByDescending(p => p.Id)
                 .Take(take + 1)
                 .Include(p => p.Media.OrderBy(m => m.SortOrder)).ThenInclude(m => m.File)
                 .Include(p => p.Translations.Where(t => t.LanguageCode == viewerLanguage))
@@ -218,6 +239,71 @@ namespace web.Repositories.Feed
 
             _logger.LogInformation("User {UserId} deleted feed post {PostId}", requestingUserId, postId);
             return new DeleteFeedPostResponseDto { Success = true };
+        }
+
+        public async Task<GetFeedPostForEditResponseDto> GetPostForEditAsync(int postId, string requestingUserId, bool isModerator, CancellationToken ct = default)
+        {
+            var post = await _context.FeedPosts.AsNoTracking().FirstOrDefaultAsync(p => p.Id == postId, ct);
+            if (post is null)
+                return new GetFeedPostForEditResponseDto { Success = false, ErrorMessage = "Opslaget findes ikke." };
+
+            if (post.AuthorId != requestingUserId && !isModerator)
+                return new GetFeedPostForEditResponseDto { Success = false, ErrorMessage = "Du kan ikke redigere dette opslag." };
+
+            return new GetFeedPostForEditResponseDto
+            {
+                Success = true,
+                PostId = post.Id,
+                Caption = post.Caption,
+                CreatedAtUtc = post.CreatedAtUtc,
+                CanEditDate = isModerator
+            };
+        }
+
+        public async Task<EditFeedPostResponseDto> EditPostAsync(EditFeedPostRequestDto dto, CancellationToken ct = default)
+        {
+            var post = await _context.FeedPosts
+                .Include(p => p.Media)
+                .Include(p => p.Translations)
+                .FirstOrDefaultAsync(p => p.Id == dto.PostId, ct);
+
+            if (post is null)
+                return new EditFeedPostResponseDto { Success = false, ErrorMessage = "Opslaget findes ikke." };
+
+            if (post.AuthorId != dto.RequestingUserId && !dto.IsModerator)
+                return new EditFeedPostResponseDto { Success = false, ErrorMessage = "Du kan ikke redigere dette opslag." };
+
+            var newCaption = string.IsNullOrWhiteSpace(dto.Caption) ? null : dto.Caption.Trim();
+            if (newCaption is null && post.Media.Count == 0)
+                return new EditFeedPostResponseDto { Success = false, ErrorMessage = "Opslaget skal have en historie eller vedhæftede billeder/videoer." };
+
+            if (!string.Equals(newCaption, post.Caption, StringComparison.Ordinal))
+            {
+                post.Caption = newCaption;
+                // The old caption's language guess and cached translations belonged to the previous
+                // text — drop them so the new caption goes through verification and translation again
+                // the next time it's viewed (same handling as VerifyPostLanguageAsync's own correction).
+                post.IsLanguageVerified = false;
+                if (post.Translations.Count > 0)
+                    _context.FeedPostTranslations.RemoveRange(post.Translations);
+            }
+
+            // Only Administrator/Developer may backdate a post — enforced here, not just hidden in the
+            // UI, so a direct POST from a non-moderator can't move it even if NewCreatedAtUtc is set.
+            var dateChanged = false;
+            if (dto.IsModerator && dto.NewCreatedAtUtc.HasValue)
+            {
+                var newCreatedAtUtc = DateTime.SpecifyKind(dto.NewCreatedAtUtc.Value, DateTimeKind.Utc);
+                dateChanged = newCreatedAtUtc != post.CreatedAtUtc;
+                post.CreatedAtUtc = newCreatedAtUtc;
+            }
+
+            post.UpdatedAtUtc = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync(ct);
+
+            _logger.LogInformation("User {UserId} edited feed post {PostId}", dto.RequestingUserId, post.Id);
+            return new EditFeedPostResponseDto { Success = true, PostId = post.Id, DateChanged = dateChanged };
         }
 
         public async Task<AddFeedCommentResponseDto> AddCommentAsync(AddFeedCommentRequestDto dto, CancellationToken ct = default)

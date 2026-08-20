@@ -16,12 +16,24 @@
             <span class="feed-author-name">@Model.AuthorDisplayName</span>
             <time class="feed-time" data-utc="@Model.CreatedAtUtc.ToString("o")">@Model.CreatedAtUtc.ToString("d. MMM yyyy HH:mm")</time>
         </div>
-        @if (Model.CanDelete)
+        @if (Model.CanEdit || Model.CanDelete)
         {
-            <button type="button" class="btn btn-secondary btn-icon btn-sm feed-delete-post ms-auto"
-                    data-post-id="@Model.Id" title="Slet opslag" aria-label="Slet opslag">
-                <i class="bi bi-trash"></i>
-            </button>
+            <div class="d-flex gap-2 ms-auto">
+                @if (Model.CanEdit)
+                {
+                    <button type="button" class="btn btn-secondary btn-icon btn-sm feed-edit-post"
+                            data-post-id="@Model.Id" title="Rediger opslag" aria-label="Rediger opslag">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                }
+                @if (Model.CanDelete)
+                {
+                    <button type="button" class="btn btn-secondary btn-icon btn-sm feed-delete-post"
+                            data-post-id="@Model.Id" title="Slet opslag" aria-label="Slet opslag">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                }
+            </div>
         }
     </div>
 

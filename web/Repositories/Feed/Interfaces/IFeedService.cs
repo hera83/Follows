@@ -17,6 +17,12 @@ namespace web.Repositories.Feed.Interfaces
 
         Task<CreateFeedPostResponseDto> CreatePostAsync(CreateFeedPostRequestDto dto, CancellationToken ct = default);
         Task<DeleteFeedPostResponseDto> DeletePostAsync(int postId, string requestingUserId, bool isModerator, CancellationToken ct = default);
+
+        /// <summary>Fetches a post's original (untranslated) caption and date for the edit modal, after checking the caller may edit it.</summary>
+        Task<GetFeedPostForEditResponseDto> GetPostForEditAsync(int postId, string requestingUserId, bool isModerator, CancellationToken ct = default);
+
+        /// <summary>Updates a post's caption, and — Administrator/Developer only — its CreatedAtUtc, so old events can be backdated to their real date.</summary>
+        Task<EditFeedPostResponseDto> EditPostAsync(EditFeedPostRequestDto dto, CancellationToken ct = default);
         Task<AddFeedCommentResponseDto> AddCommentAsync(AddFeedCommentRequestDto dto, CancellationToken ct = default);
 
         /// <summary>

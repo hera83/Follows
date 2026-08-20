@@ -28,7 +28,10 @@ else
                     var iconClass = DocumentLimits.IconClassFor(doc.ContentType);
                     <tr>
                         <td>
-                            <i class="bi @iconClass me-2"></i>@doc.Title
+                            <i class="bi @iconClass me-2"></i><button type="button" class="btn btn-link p-0 align-baseline doc-title-link" data-bs-toggle="modal" data-bs-target="#documentPreviewModal"
+                                    data-id="@doc.Id" data-title="@doc.Title" data-content-type="@doc.ContentType"
+                                    data-can-preview="@doc.CanPreviewInline.ToString().ToLower()" data-icon="@iconClass"
+                                    title="Vis" aria-label="Vis @doc.Title">@doc.Title</button>
                         </td>
                         <td>@doc.UploadedByDisplayName</td>
                         <td>@doc.CreatedAtUtc.ToLocalTime().ToString("d. MMM yyyy", new System.Globalization.CultureInfo("da-DK"))</td>

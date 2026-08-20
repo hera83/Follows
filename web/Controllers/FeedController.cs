@@ -48,6 +48,7 @@ namespace web.Controllers
                 CurrentUserId = user.Id,
                 CurrentUserDisplayName = user.DisplayName,
                 CurrentUserHasAvatar = user.ProfilePictureId.HasValue,
+                CurrentUserIsModerator = isModerator,
                 TranslatingBannerFormat = labels.TranslatingBannerFormat,
                 TranslatingLabel = labels.Translating
             };
@@ -290,6 +291,55 @@ namespace web.Controllers
             return Json(new { success = true, message = "Kommentar slettet.", type = "success", postId = result.PostId });
         }
 
+        /// <summary>Populates the edit-post modal with the post's original (untranslated) caption and date.</summary>
+        [HttpGet]
+        public async Task<IActionResult> EditPostData(int id)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user is null) return Unauthorized();
+
+            var result = await _feedService.GetPostForEditAsync(id, user.Id, IsModerator(), HttpContext.RequestAborted);
+            if (!result.Success)
+                return this.ToastErrorJson(result.ErrorMessage ?? "Opslaget kunne ikke hentes.");
+
+            return Json(new
+            {
+                success = true,
+                postId = result.PostId,
+                caption = result.Caption,
+                createdAtUtc = result.CreatedAtUtc.ToString("o"),
+                canEditDate = result.CanEditDate
+            });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditPost(EditFeedPostViewModel model)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user is null) return Unauthorized();
+
+            if (!ModelState.IsValid)
+            {
+                var errors = string.Join(" ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage));
+                return this.ToastErrorJson(string.IsNullOrWhiteSpace(errors) ? "Opslaget kunne ikke gemmes." : errors);
+            }
+
+            var result = await _feedService.EditPostAsync(new EditFeedPostRequestDto
+            {
+                PostId = model.PostId,
+                RequestingUserId = user.Id,
+                IsModerator = IsModerator(),
+                Caption = model.Caption,
+                NewCreatedAtUtc = model.CreatedAtUtc?.UtcDateTime
+            }, HttpContext.RequestAborted);
+
+            if (!result.Success)
+                return this.ToastErrorJson(result.ErrorMessage ?? "Opslaget kunne ikke gemmes.");
+
+            return Json(new { success = true, message = "Opslaget er opdateret.", type = "success", postId = result.PostId, dateChanged = result.DateChanged });
+        }
+
         [HttpGet]
         public async Task<IActionResult> Media(int id)
         {
@@ -318,6 +368,8 @@ namespace web.Controllers
             LikeCount = dto.LikeCount,
             IsLikedByCurrentUser = dto.IsLikedByCurrentUser,
             CanDelete = dto.AuthorId == currentUserId || isModerator,
+            CanEdit = dto.AuthorId == currentUserId || isModerator,
+            CanEditDate = isModerator,
             Comments = dto.Comments.Select(c => MapCommentToViewModel(c, currentUserId, isModerator, labels)).ToList()
         };
 
