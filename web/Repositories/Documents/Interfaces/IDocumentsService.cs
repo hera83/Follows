@@ -20,6 +20,6 @@ namespace web.Repositories.Documents.Interfaces
 
         Task<DocumentFileDto?> GetDocumentFileAsync(int documentId, CancellationToken ct = default);
 
-        Task<TranslateDocumentResponseDto> TranslateDocumentAsync(int documentId, string preferredLanguageCode, CancellationToken ct = default);
+        Task<TranslateDocumentResponseDto> TranslateDocumentAsync(int documentId, string preferredLanguageCode, bool force = false, CancellationToken ct = default);
     }
 }

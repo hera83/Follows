@@ -151,9 +151,12 @@
             </div>
             <div class="modal-body doc-preview-body" id="documentPreviewBody"></div>
             <div class="modal-footer">
+                <button type="button" class="btn btn-secondary d-none" id="documentTranslateBackBtn" title="Tilbage til den oprindelige fil">
+                    <i class="bi bi-arrow-left me-1"></i>Tilbage
+                </button>
                 <button type="button" class="btn btn-secondary" id="documentTranslateBtn" title="Oversæt til dit foretrukne sprog">
                     <span class="spinner-border spinner-border-sm me-1 d-none" data-translate-spinner></span>
-                    <i class="bi bi-translate me-1" data-translate-icon></i>Oversæt
+                    <i class="bi bi-translate me-1" data-translate-icon></i><span data-translate-label>Oversæt</span>
                 </button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Luk</button>
                 <a class="btn btn-primary" id="documentPreviewDownload" download><i class="bi bi-download me-1"></i>Download</a>
@@ -239,24 +242,30 @@
             const translateBtn = document.getElementById('documentTranslateBtn');
             const translateSpinner = translateBtn?.querySelector('[data-translate-spinner]');
             const translateIcon = translateBtn?.querySelector('[data-translate-icon]');
+            const translateLabel = translateBtn?.querySelector('[data-translate-label]');
+            const translateBackBtn = document.getElementById('documentTranslateBackBtn');
             let currentPreviewDocId = null;
+            let currentPreviewTitle = '';
+            let currentPreviewContentType = '';
+            let currentPreviewCanPreview = false;
+            let hasTranslatedResult = false; // true once a real translation is showing — next click re-translates (force) instead of using the cache
 
-            previewModal?.addEventListener('show.bs.modal', async (event) => {
-                const btn = event.relatedTarget;
-                if (!btn) return;
+            // Efter et vellykket oversæt-kald bliver knappen til "Genoversæt", så man kan tvinge en frisk
+            // oversættelse igennem (springer serverens cache over) i stedet for altid at få den samme
+            // cachede tekst igen — nyttigt hvis første forsøg kom ud tomt/ufuldstændigt. "Tilbage"-knappen
+            // følger samme tilstand, da den kun giver mening mens en oversættelse vises.
+            const setTranslateButtonMode = (isRetry) => {
+                hasTranslatedResult = isRetry;
+                if (translateLabel) translateLabel.textContent = isRetry ? 'Genoversæt' : 'Oversæt';
+                if (translateIcon) translateIcon.className = `bi ${isRetry ? 'bi-arrow-repeat' : 'bi-translate'} me-1`;
+                if (translateBtn) translateBtn.title = isRetry ? 'Oversæt dokumentet igen (ignorerer den gemte oversættelse)' : 'Oversæt til dit foretrukne sprog';
+                translateBackBtn?.classList.toggle('d-none', !isRetry);
+            };
 
-                const id = btn.dataset.id;
-                const title = btn.dataset.title;
-                const contentType = btn.dataset.contentType;
-                const canPreview = btn.dataset.canPreview === 'true';
+            // Gengiver den oprindelige forhåndsvisning (PDF/billede/tekst) — brugt både når popup'en
+            // åbnes første gang, og når man trykker "Tilbage" fra den oversatte Markdown-visning.
+            const renderOriginalPreview = async (id, title, contentType, canPreview) => {
                 const viewUrl = `@Url.Action("View")/${id}`;
-
-                currentPreviewDocId = id;
-                translateBtn?.classList.toggle('d-none', btn.dataset.canTranslate !== 'true');
-
-                previewTitle.textContent = title;
-                previewIcon.className = `bi ${btn.dataset.icon || 'bi-file-earmark'} me-2`;
-                previewDownload.href = `@Url.Action("Download")/${id}`;
                 previewBody.innerHTML = '<div class="doc-preview-loading"><span class="spinner-border spinner-border-sm me-2"></span>Indlæser...</div>';
 
                 if (!canPreview) {
@@ -285,6 +294,34 @@
                         previewBody.innerHTML = '<div class="doc-preview-fallback"><p>Kunne ikke indlæse filen.</p></div>';
                     }
                 }
+            };
+
+            previewModal?.addEventListener('show.bs.modal', async (event) => {
+                const btn = event.relatedTarget;
+                if (!btn) return;
+
+                const id = btn.dataset.id;
+                const title = btn.dataset.title;
+                const contentType = btn.dataset.contentType;
+                const canPreview = btn.dataset.canPreview === 'true';
+
+                currentPreviewDocId = id;
+                currentPreviewTitle = title;
+                currentPreviewContentType = contentType;
+                currentPreviewCanPreview = canPreview;
+                setTranslateButtonMode(false);
+                translateBtn?.classList.toggle('d-none', btn.dataset.canTranslate !== 'true');
+
+                previewTitle.textContent = title;
+                previewIcon.className = `bi ${btn.dataset.icon || 'bi-file-earmark'} me-2`;
+                previewDownload.href = `@Url.Action("Download")/${id}`;
+
+                await renderOriginalPreview(id, title, contentType, canPreview);
+            });
+
+            translateBackBtn?.addEventListener('click', async () => {
+                setTranslateButtonMode(false);
+                await renderOriginalPreview(currentPreviewDocId, currentPreviewTitle, currentPreviewContentType, currentPreviewCanPreview);
             });
 
             previewModal?.addEventListener('hidden.bs.modal', () => {
@@ -311,9 +348,12 @@
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 20 * 60 * 1000);
 
+                const wasRetry = hasTranslatedResult;
+
                 try {
                     const formData = new FormData();
                     if (token) formData.append('__RequestVerificationToken', token);
+                    if (wasRetry) formData.append('force', 'true'); // spring den gemte oversættelse over, oversæt igen fra bunden
 
                     const res = await fetch(`@Url.Action("Translate")/${currentPreviewDocId}`, {
                         method: 'POST',
@@ -335,6 +375,7 @@
 
                     // Fjern den oprindelige forhåndsvisning (PDF-reader/billede/tekst) og vis den oversatte Markdown i stedet.
                     previewBody.innerHTML = `<div class="doc-preview-markdown">${data.html}</div>`;
+                    setTranslateButtonMode(true); // knappen bliver til "Genoversæt" — næste klik tvinger en frisk oversættelse igennem
 
                     if (data.truncated) {
                         FvToast.show('warning', 'Dokumentet var langt og blev afkortet før oversættelse — enkelte afsnit mangler muligvis.');
@@ -348,7 +389,7 @@
                     translateBtn.disabled = false;
                     translateSpinner?.classList.add('d-none');
                     translateIcon?.classList.remove('d-none');
-                    translateBtn.title = 'Oversæt til dit foretrukne sprog';
+                    setTranslateButtonMode(hasTranslatedResult); // gendan korrekt label/ikon/title (Oversæt eller Genoversæt)
                 }
             });
         })();

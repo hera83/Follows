@@ -233,16 +233,18 @@ namespace web.Controllers
         /// <summary>
         /// Extracts the document's text and translates it to the caller's preferred language (from their
         /// profile), formatted as Markdown and rendered to HTML — consumed by the preview modal's
-        /// "Oversæt"-button. Returns success:false with a toast-style message on failure.
+        /// "Oversæt"/"Genoversæt"-button. Returns success:false with a toast-style message on failure.
+        /// A cached translation is normally reused (see DocumentsService); pass <paramref name="force"/> to
+        /// skip that cache and translate again from scratch, overwriting it.
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Translate(int id)
+        public async Task<IActionResult> Translate(int id, bool force = false)
         {
             var user = await _userManager.GetUserAsync(User);
             if (user is null) return Unauthorized();
 
-            var result = await _documentsService.TranslateDocumentAsync(id, user.PreferredLanguage, HttpContext.RequestAborted);
+            var result = await _documentsService.TranslateDocumentAsync(id, user.PreferredLanguage, force, HttpContext.RequestAborted);
             if (!result.Success)
                 return this.ToastErrorJson(result.ErrorMessage ?? "Oversættelsen mislykkedes.");
 

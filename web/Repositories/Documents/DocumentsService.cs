@@ -289,9 +289,12 @@ namespace web.Repositories.Documents
         /// Extracts the document's text, and — unless it's already written in <paramref name="preferredLanguageCode"/> —
         /// translates it there and formats it as Markdown, rendered to sanitized HTML for the preview modal.
         /// Results are cached per (document, language): documents are immutable once uploaded, so a document
-        /// only ever goes through extraction + translation once per language.
+        /// only ever goes through extraction + translation once per language — unless <paramref name="force"/>
+        /// is set (the preview modal's "Genoversæt"-button), which skips the cache and overwrites it with a
+        /// freshly translated result. Useful when a first attempt came out empty/partial (e.g. from the
+        /// model-reasoning issue chunking guards against) and the document is worth simply trying again.
         /// </summary>
-        public async Task<TranslateDocumentResponseDto> TranslateDocumentAsync(int documentId, string preferredLanguageCode, CancellationToken ct = default)
+        public async Task<TranslateDocumentResponseDto> TranslateDocumentAsync(int documentId, string preferredLanguageCode, bool force = false, CancellationToken ct = default)
         {
             var document = await _context.Documents
                 .AsNoTracking()
@@ -312,15 +315,16 @@ namespace web.Repositories.Documents
             var targetLanguageCode = AppLanguages.Normalize(preferredLanguageCode);
             var targetNative = AppLanguages.GetNativeName(targetLanguageCode);
 
-            var cached = await _context.DocumentTranslations
-                .AsNoTracking()
+            // Tracked (not AsNoTracking): a force-retry reuses this same row and updates it in place below,
+            // instead of inserting a second row that the (DocumentId, LanguageCode) unique index would reject.
+            var existingTranslation = await _context.DocumentTranslations
                 .FirstOrDefaultAsync(t => t.DocumentId == documentId && t.LanguageCode == targetLanguageCode, ct);
-            if (cached is not null)
+            if (existingTranslation is not null && !force)
             {
                 return new TranslateDocumentResponseDto
                 {
                     Success = true,
-                    Html = MarkdownRenderer.ToSafeHtml(cached.TranslatedMarkdown),
+                    Html = MarkdownRenderer.ToSafeHtml(existingTranslation.TranslatedMarkdown),
                     TargetLanguageName = targetNative
                 };
             }
@@ -413,14 +417,27 @@ namespace web.Repositories.Documents
             if (string.IsNullOrWhiteSpace(markdown))
                 return new TranslateDocumentResponseDto { Success = false, ErrorMessage = "Oversættelsen mislykkedes. Prøv igen senere." };
 
-            var entity = new DocumentTranslation
+            DocumentTranslation entity;
+            if (existingTranslation is not null)
             {
-                DocumentId = documentId,
-                LanguageCode = targetLanguageCode,
-                TranslatedMarkdown = markdown,
-                CreatedAtUtc = DateTime.UtcNow
-            };
-            _context.DocumentTranslations.Add(entity);
+                // Force-retry: overwrite the existing cached row in place rather than inserting a second
+                // one, which the (DocumentId, LanguageCode) unique index would reject anyway.
+                entity = existingTranslation;
+                entity.TranslatedMarkdown = markdown;
+                entity.CreatedAtUtc = DateTime.UtcNow;
+            }
+            else
+            {
+                entity = new DocumentTranslation
+                {
+                    DocumentId = documentId,
+                    LanguageCode = targetLanguageCode,
+                    TranslatedMarkdown = markdown,
+                    CreatedAtUtc = DateTime.UtcNow
+                };
+                _context.DocumentTranslations.Add(entity);
+            }
+
             try
             {
                 await _context.SaveChangesAsync(ct);
