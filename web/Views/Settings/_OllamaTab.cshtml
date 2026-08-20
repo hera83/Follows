@@ -1,0 +1,280 @@
+@model web.ViewModels.OllamaSettingsViewModel
+
+<div data-table-root id="ollamaTabRoot" data-table-endpoint="@Url.Action("OllamaTable")">
+    <div class="table-toolbar mb-3">
+        <div class="table-toolbar-end">
+            <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#ollamaChatModal" title="Chat" aria-label="Chat">
+                <i class="bi bi-chat-dots"></i> Chat
+            </button>
+            <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#pullOllamaModelModal" title="Hent model" aria-label="Hent model">
+                <i class="bi bi-cloud-download"></i> Hent model
+            </button>
+        </div>
+    </div>
+
+    <div data-table-region>
+        @await Html.PartialAsync("_OllamaTabBody", Model)
+    </div>
+</div>
+
+<!-- Skjulte forms til hurtig indlæs/fjern-handling pr. modelrække -->
+<form id="loadOllamaModelForm" asp-action="LoadOllamaModel" method="post" class="d-none">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="modelName" />
+</form>
+<form id="unloadOllamaModelForm" asp-action="UnloadOllamaModel" method="post" class="d-none">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="modelName" />
+</form>
+<form id="refreshOllamaModelForm" asp-action="PullOllamaModel" method="post" class="d-none">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="ModelName" />
+</form>
+
+<!-- Hent model modal -->
+<div class="modal fade" id="pullOllamaModelModal" tabindex="-1" aria-labelledby="pullOllamaModelModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form asp-action="PullOllamaModel" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <h5 class="modal-title" id="pullOllamaModelModalLabel"><i class="bi bi-cloud-download me-2"></i>Hent model</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label">Modelnavn</label>
+                    <input name="ModelName" class="form-control" placeholder="f.eks. llama3:8b" required />
+                    <div class="form-text">Download kan tage lang tid afhængigt af modellens størrelse.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i> Annuller
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="spinner-border spinner-border-sm me-1 d-none" data-pull-spinner></span>
+                        <i class="bi bi-cloud-download me-1" data-pull-icon></i> Hent
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Chat modal -->
+<div class="modal fade" id="ollamaChatModal" tabindex="-1" aria-labelledby="ollamaChatModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ollamaChatModalLabel"><i class="bi bi-chat-dots me-2"></i>Chat</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body p-0">
+                @await Html.PartialAsync("~/Views/Shared/Partials/_Chat.cshtml", new web.ViewModels.ChatWidgetViewModel
+                {
+                    Title = "Ollama chat",
+                    Model = Model.DefaultChatModel
+                })
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Slet model modal -->
+<div class="modal fade" id="deleteOllamaModelModal" tabindex="-1" aria-labelledby="deleteOllamaModelModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteOllamaModelModalLabel"><i class="bi bi-trash me-2"></i>Slet model</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body">
+                Er du sikker på, at du vil slette modellen <strong id="deleteOllamaModelName"></strong>? Denne handling kan ikke fortrydes.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i> Annuller
+                </button>
+                <form asp-action="DeleteOllamaModel" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="modelName" id="deleteOllamaModelInput" />
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash me-1"></i> Slet
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (() => {
+        const root = document.getElementById('ollamaTabRoot');
+
+        document.getElementById('ollamaChatModal')?.addEventListener('show.bs.modal', (event) => {
+            const chatWidget = event.target.querySelector('.chat-widget');
+            if (chatWidget) window.FvChat?.reset(chatWidget);
+        });
+
+        const loadForm = document.getElementById('loadOllamaModelForm');
+        const unloadForm = document.getElementById('unloadOllamaModelForm');
+        const refreshForm = document.getElementById('refreshOllamaModelForm');
+
+        // Henter Aktive modeller-tabellen igen. Ollama kan tage et kort øjeblik om at
+        // få en lige-unloadet/loadet model til at slå igennem i /api/ps, så der forsøges
+        // et par gange (op til ~2 sek.) indtil resultatet matcher det forventede, før den
+        // sidst hentede version sættes ind.
+        const reloadRunningModels = async (modelName, expectPresent) => {
+            const container = document.getElementById('ollamaRunningModelsBody');
+            if (!container) return;
+            try {
+                let html;
+                for (let attempt = 0; attempt < 5; attempt++) {
+                    const res = await fetch('@Url.Action("OllamaRunningModelsTable")', { headers: { 'X-Requested-With': 'fetch' } });
+                    if (!res.ok) throw new Error('fetch failed');
+                    html = await res.text();
+                    const isPresent = modelName ? html.includes(modelName) : true;
+                    if (isPresent === expectPresent) break;
+                    await new Promise((resolve) => setTimeout(resolve, 400));
+                }
+                container.innerHTML = html;
+            } catch {
+                window.FvToast?.show('error', 'Kunne ikke opdatere aktive modeller.');
+            }
+        };
+
+        // Opdaterer "Aktiv"-badge, samt knappernes disabled-status for rækken
+        // i Installerede modeller-tabellen, uden at hente noget fra serveren igen.
+        const updateInstalledRowState = (btn, isRunning) => {
+            const row = btn.closest('tr');
+            if (!row) return;
+
+            const nameCell = row.querySelector('td:first-child');
+            const existingBadge = nameCell?.querySelector('.badge-ok');
+            if (isRunning && !existingBadge) {
+                const badge = document.createElement('span');
+                badge.className = 'badge-ok ms-1';
+                badge.textContent = 'Aktiv';
+                nameCell.appendChild(badge);
+            } else if (!isRunning && existingBadge) {
+                existingBadge.remove();
+            }
+
+            const loadBtn = row.querySelector('[data-ollama-load]');
+            if (loadBtn) {
+                loadBtn.disabled = isRunning;
+                loadBtn.title = isRunning ? 'Modellen er allerede indlæst' : 'Indlæs i hukommelse';
+            }
+
+            const unloadBtn = row.querySelector('[data-ollama-unload]');
+            if (unloadBtn) {
+                unloadBtn.disabled = !isRunning;
+                unloadBtn.title = isRunning ? 'Fjern fra hukommelse' : 'Modellen er ikke indlæst';
+            }
+
+            const refreshBtn = row.querySelector('[data-ollama-refresh]');
+            if (refreshBtn) {
+                refreshBtn.disabled = isRunning;
+                refreshBtn.title = isRunning ? 'Fjern modellen fra hukommelsen før opdatering' : 'Opdater model fra Ollama (pull)';
+            }
+
+            const deleteBtn = row.querySelector('[data-bs-target="#deleteOllamaModelModal"]');
+            if (deleteBtn) {
+                deleteBtn.disabled = isRunning;
+                deleteBtn.title = isRunning ? 'Fjern modellen fra hukommelsen før sletning' : 'Slet';
+            }
+        };
+
+        // Når en model loades, kan Ollama (afhængig af serverens opsætning, f.eks. kun
+        // én model i hukommelsen ad gangen) fortrænge en anden model. Den klikkede række
+        // er allerede opdateret optimistisk – denne funktion retter ALLE andre rækker i
+        // Installerede modeller op efter den friske sandhed fra Aktive modeller-tabellen.
+        const syncInstalledRowsWithActiveTable = () => {
+            const activeContainer = document.getElementById('ollamaRunningModelsBody');
+            if (!activeContainer || !root) return;
+
+            const runningNames = new Set();
+            activeContainer.querySelectorAll('tbody tr').forEach((tr) => {
+                const cell = tr.querySelector('td:first-child');
+                if (!cell) return;
+                const clone = cell.cloneNode(true);
+                clone.querySelectorAll('.badge-ok').forEach((badge) => badge.remove());
+                const name = clone.textContent.trim();
+                if (name) runningNames.add(name);
+            });
+
+            root.querySelectorAll('[data-ollama-load]').forEach((loadBtnEl) => {
+                updateInstalledRowState(loadBtnEl, runningNames.has(loadBtnEl.dataset.name));
+            });
+        };
+
+        root?.addEventListener('click', async (e) => {
+            const loadBtn = e.target.closest('[data-ollama-load]');
+            const unloadBtn = e.target.closest('[data-ollama-unload]');
+            const refreshBtn = e.target.closest('[data-ollama-refresh]');
+            const btn = loadBtn || unloadBtn || refreshBtn;
+            if (!btn || btn.disabled) return;
+
+            const icon = btn.querySelector('i');
+            const iconClass = icon.className;
+            btn.disabled = true;
+            icon.className = 'spinner-border spinner-border-sm';
+
+            if (refreshBtn) {
+                refreshForm.querySelector('input[name="ModelName"]').value = btn.dataset.name;
+                const data = await window.FvForm.submit(refreshForm);
+                btn.disabled = false;
+                icon.className = iconClass;
+                if (data.success) window.FvDataTable?.reload(root);
+                return;
+            }
+
+            const form = loadBtn ? loadForm : unloadForm;
+            form.querySelector('input[name="modelName"]').value = btn.dataset.name;
+
+            const data = await window.FvForm.submit(form);
+
+            btn.disabled = false;
+            icon.className = iconClass;
+            if (data.success) {
+                const isNowRunning = !!loadBtn;
+                updateInstalledRowState(btn, isNowRunning);
+                await reloadRunningModels(btn.dataset.name, isNowRunning);
+                syncInstalledRowsWithActiveTable();
+            }
+        });
+
+        const handleAjaxSubmit = (form, modalEl) => {
+            if (!form) return;
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const submitBtn = form.querySelector('button[type="submit"]');
+                const spinner = form.querySelector('[data-pull-spinner]');
+                const icon = form.querySelector('[data-pull-icon]');
+                if (submitBtn) submitBtn.disabled = true;
+                spinner?.classList.remove('d-none');
+                icon?.classList.add('d-none');
+                const data = await window.FvForm.submit(form);
+                if (submitBtn) submitBtn.disabled = false;
+                spinner?.classList.add('d-none');
+                icon?.classList.remove('d-none');
+                if (data.success) {
+                    if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+                    form.reset();
+                    window.FvDataTable?.reload(root);
+                }
+            });
+        };
+
+        const pullModal = document.getElementById('pullOllamaModelModal');
+        handleAjaxSubmit(pullModal?.querySelector('form'), pullModal);
+
+        const deleteModal = document.getElementById('deleteOllamaModelModal');
+        handleAjaxSubmit(deleteModal?.querySelector('form'), deleteModal);
+        deleteModal?.addEventListener('show.bs.modal', (event) => {
+            const btn = event.relatedTarget;
+            if (!btn) return;
+            document.getElementById('deleteOllamaModelInput').value = btn.dataset.name;
+            document.getElementById('deleteOllamaModelName').textContent = btn.dataset.name;
+        });
+    })();
+</script>

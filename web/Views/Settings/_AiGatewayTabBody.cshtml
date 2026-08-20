@@ -1,0 +1,232 @@
+@using web.Infrastructure
+@model web.ViewModels.AiGatewaySettingsViewModel
+
+<div class="row g-3 mb-3">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <i class="bi @(Model.IsOnline ? "bi-check-circle-fill text-success" : "bi-x-circle-fill text-danger") fs-3"></i>
+                <div>
+                    <div class="aigw-card-label">@(Model.IsOnline ? "Online" : "Offline")</div>
+                    <div class="text-muted small">
+                        @if (Model.IsOnline)
+                        {
+                            <text>AiGateway - v. 2.0.0</text>
+                        }
+                        else
+                        {
+                            <text>@(Model.ErrorMessage ?? "Kunne ikke forbinde til serveren.") (@Model.BaseUrl)</text>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<style>
+    .aigw-card-label {
+        color: var(--clr-text);
+        font-weight: 600;
+    }
+</style>
+
+<div class="card mb-3">
+    <div class="card-header"><strong>Grupper</strong></div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Navn</th>
+                        <th>Dokumenter</th>
+                        <th>Oprettet</th>
+                        <th class="text-end">Handlinger</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.IsOnline)
+                    {
+                        <tr><td colspan="4" class="text-muted">Serveren er offline.</td></tr>
+                    }
+                    else if (Model.Groups.Count == 0)
+                    {
+                        <tr><td colspan="4" class="text-muted">Ingen grupper oprettet endnu.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var g in Model.Groups)
+                        {
+                            <tr>
+                                <td>@g.Name</td>
+                                <td>@g.DocumentCount</td>
+                                <td>@g.CreatedAtUtc.ToLocalTime().ToString("g")</td>
+                                <td class="text-end">
+                                    <div class="d-inline-flex gap-1">
+                                        <button class="btn btn-sm btn-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#uploadAiGatewayDocumentModal"
+                                                data-group-id="@g.Id" data-group-name="@g.Name" title="Upload dokument" aria-label="Upload dokument">
+                                            <i class="bi bi-upload"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#deleteAiGatewayGroupModal"
+                                                data-id="@g.Id" data-name="@g.Name" title="Slet gruppe" aria-label="Slet gruppe">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header"><strong>Dokumenter</strong></div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Fil</th>
+                        <th>Gruppe</th>
+                        <th>Størrelse</th>
+                        <th>Status</th>
+                        <th>Uploadet</th>
+                        <th class="text-end">Handlinger</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.IsOnline)
+                    {
+                        <tr><td colspan="6" class="text-muted">Serveren er offline.</td></tr>
+                    }
+                    else if (Model.Documents.Count == 0)
+                    {
+                        <tr><td colspan="6" class="text-muted">Ingen dokumenter uploadet endnu.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var d in Model.Documents)
+                        {
+                            <tr>
+                                <td>@d.FileName</td>
+                                <td>@(d.GroupName ?? "–")</td>
+                                <td>@ByteSizeFormatter.Format(d.SizeBytes)</td>
+                                <td>@(d.Status ?? "–")</td>
+                                <td>@d.UploadedAtUtc.ToLocalTime().ToString("g")</td>
+                                <td class="text-end">
+                                    <div class="d-inline-flex gap-1">
+                                        <a class="btn btn-sm btn-secondary btn-icon" href="@Url.Action("DownloadAiGatewayDocument", new { id = d.Id })" title="Download" aria-label="Download">
+                                            <i class="bi bi-download"></i>
+                                        </a>
+                                        <button class="btn btn-sm btn-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#deleteAiGatewayDocumentModal"
+                                                data-id="@d.Id" data-name="@d.FileName" title="Slet dokument" aria-label="Slet dokument">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header"><strong>Ollama-modeller (via AiGateway)</strong></div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Navn</th>
+                        <th>Parametre</th>
+                        <th>Quantization</th>
+                        <th>Størrelse</th>
+                        <th>Ændret</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.IsOnline)
+                    {
+                        <tr><td colspan="5" class="text-muted">Serveren er offline.</td></tr>
+                    }
+                    else if (Model.OllamaModels.Count == 0)
+                    {
+                        <tr><td colspan="5" class="text-muted">Ingen modeller fundet.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var m in Model.OllamaModels)
+                        {
+                            <tr>
+                                <td>
+                                    @m.Name
+                                    @if (m.IsRunning)
+                                    {
+                                        <span class="badge-ok ms-1">Aktiv</span>
+                                    }
+                                </td>
+                                <td>@(m.ParameterSize ?? "–")</td>
+                                <td>@(m.QuantizationLevel ?? "–")</td>
+                                <td>@ByteSizeFormatter.Format(m.Size)</td>
+                                <td>@(m.ModifiedAt?.ToLocalTime().ToString("g") ?? "–")</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><strong>Speaches-modeller (via AiGateway)</strong></div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>Ejer</th>
+                        <th>Opgave</th>
+                        <th>Sprog</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.IsOnline)
+                    {
+                        <tr><td colspan="4" class="text-muted">Serveren er offline.</td></tr>
+                    }
+                    else if (Model.SpeachesModels.Count == 0)
+                    {
+                        <tr><td colspan="4" class="text-muted">Ingen modeller fundet.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var m in Model.SpeachesModels)
+                        {
+                            <tr>
+                                <td>
+                                    @m.Id
+                                    @if (m.IsRunning)
+                                    {
+                                        <span class="badge-ok ms-1">Aktiv</span>
+                                    }
+                                </td>
+                                <td>@(m.OwnedBy ?? "–")</td>
+                                <td>@(m.Task ?? "–")</td>
+                                <td>@(m.Language.Count > 0 ? string.Join(", ", m.Language) : "–")</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

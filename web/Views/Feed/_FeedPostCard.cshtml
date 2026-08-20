@@ -1,0 +1,100 @@
+@model web.ViewModels.FeedPostViewModel
+
+<article class="feed-post card" data-post-id="@Model.Id" data-needs-translation="@Model.NeedsTranslation.ToString().ToLowerInvariant()">
+    <div class="feed-post-header">
+        <div class="feed-avatar">
+            @if (Model.AuthorHasAvatar)
+            {
+                <img src="@Url.Action("Avatar", "Profile", new { userId = Model.AuthorId })" alt="@Model.AuthorDisplayName" />
+            }
+            else
+            {
+                <i class="bi bi-person-circle"></i>
+            }
+        </div>
+        <div class="feed-post-header-text">
+            <span class="feed-author-name">@Model.AuthorDisplayName</span>
+            <time class="feed-time" data-utc="@Model.CreatedAtUtc.ToString("o")">@Model.CreatedAtUtc.ToString("d. MMM yyyy HH:mm")</time>
+        </div>
+        @if (Model.CanDelete)
+        {
+            <button type="button" class="btn btn-secondary btn-icon btn-sm feed-delete-post ms-auto"
+                    data-post-id="@Model.Id" title="Slet opslag" aria-label="Slet opslag">
+                <i class="bi bi-trash"></i>
+            </button>
+        }
+    </div>
+
+    @if (Model.NeedsTranslation)
+    {
+        <span class="feed-translating-badge"><span class="spinner-border spinner-border-sm"></span> @Model.TranslatingLabel</span>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.Caption))
+    {
+        <p class="feed-caption @(Model.IsTranslated ? "feed-translated" : "")">@Model.Caption</p>
+        @if (Model.IsTranslated)
+        {
+            <span class="feed-translated-badge"><i class="bi bi-translate"></i> @Model.TranslatedLabel</span>
+        }
+    }
+
+    @if (Model.Media.Count > 0)
+    {
+        var visibleCount = Math.Min(Model.Media.Count, 4);
+        var extraCount = Model.Media.Count - visibleCount;
+        <div class="feed-media-grid" data-count="@visibleCount">
+            @for (var i = 0; i < visibleCount; i++)
+            {
+                var media = Model.Media[i];
+                var isOverlayTile = extraCount > 0 && i == visibleCount - 1;
+                <button type="button" class="feed-media-item @(media.IsVideo ? "feed-media-video" : "")"
+                        data-post-id="@Model.Id" data-media-id="@media.Id" data-index="@i">
+                    @if (media.IsVideo)
+                    {
+                        <span class="feed-media-play"><i class="bi bi-play-circle-fill"></i></span>
+                    }
+                    else
+                    {
+                        <img src="@Url.Action("Media", "Feed", new { id = media.Id })" loading="lazy" alt="Opslagsbillede" />
+                    }
+                    @if (isOverlayTile)
+                    {
+                        <span class="feed-media-more">+@extraCount</span>
+                    }
+                </button>
+            }
+        </div>
+    }
+
+    <div class="feed-post-actions">
+        <button type="button" class="feed-like-btn @(Model.IsLikedByCurrentUser ? "is-liked" : "")"
+                data-post-id="@Model.Id" aria-pressed="@Model.IsLikedByCurrentUser.ToString().ToLowerInvariant()">
+            <i class="bi @(Model.IsLikedByCurrentUser ? "bi-heart-fill" : "bi-heart")"></i>
+            <span class="feed-like-count">@Model.LikeCount</span>
+        </button>
+        <span class="feed-comment-count" data-count="@Model.Comments.Count">
+            <i class="bi bi-chat"></i> <span class="feed-comment-count-num">@Model.Comments.Count</span>
+        </span>
+    </div>
+
+    <div class="feed-comments">
+        @foreach (var comment in Model.Comments)
+        {
+            @await Html.PartialAsync("_FeedCommentItem", comment)
+        }
+    </div>
+
+    <form class="feed-comment-form" data-post-id="@Model.Id"
+          action="@Url.Action("Comment", "Feed")" method="post">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="PostId" value="@Model.Id" />
+        <div class="feed-avatar feed-avatar-sm">
+            <i class="bi bi-person-circle"></i>
+        </div>
+        <input type="text" name="Body" class="feed-comment-input" placeholder="Skriv en kommentar..." maxlength="1000" required />
+        <button type="submit" class="feed-comment-send" title="Send" aria-label="Send">
+            <i class="bi bi-send"></i>
+        </button>
+    </form>
+</article>

@@ -1,0 +1,70 @@
+@model web.ViewModels.DocumentGroupDetailViewModel
+@using web.Constants
+
+@if (Model.Documents.Count == 0)
+{
+    <div class="doc-empty">
+        <i class="bi bi-file-earmark"></i>
+        <h2>Ingen dokumenter endnu</h2>
+        <p>Upload en fil for at komme i gang.</p>
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Fil</th>
+                    <th>Uploadet af</th>
+                    <th>Dato</th>
+                    <th>Størrelse</th>
+                    <th class="text-end">Handlinger</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var doc in Model.Documents)
+                {
+                    var iconClass = DocumentLimits.IconClassFor(doc.ContentType);
+                    <tr>
+                        <td>
+                            <i class="bi @iconClass me-2"></i>@doc.Title
+                        </td>
+                        <td>@doc.UploadedByDisplayName</td>
+                        <td>@doc.CreatedAtUtc.ToLocalTime().ToString("d. MMM yyyy", new System.Globalization.CultureInfo("da-DK"))</td>
+                        <td>@FormatFileSize(doc.FileSizeBytes)</td>
+                        <td class="text-end">
+                            <div class="d-inline-flex gap-1">
+                                <button type="button" class="btn btn-sm btn-secondary btn-icon" data-bs-toggle="modal" data-bs-target="#documentPreviewModal"
+                                        data-id="@doc.Id" data-title="@doc.Title" data-content-type="@doc.ContentType"
+                                        data-can-preview="@doc.CanPreviewInline.ToString().ToLower()" data-icon="@iconClass"
+                                        title="Vis" aria-label="Vis">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                                <a class="btn btn-sm btn-secondary btn-icon" href="@Url.Action("Download", new { id = doc.Id })" title="Download" aria-label="Download">
+                                    <i class="bi bi-download"></i>
+                                </a>
+                                @if (doc.CanDelete)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-danger btn-icon" data-bs-toggle="modal" data-bs-target="#deleteDocumentModal"
+                                            data-id="@doc.Id" data-title="@doc.Title" title="Slet" aria-label="Slet">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@functions {
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes >= 1024 * 1024) return $"{bytes / (1024.0 * 1024.0):0.#} MB";
+        if (bytes >= 1024) return $"{bytes / 1024.0:0.#} KB";
+        return $"{bytes} B";
+    }
+}

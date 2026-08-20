@@ -1,0 +1,129 @@
+@using web.Data.Entities
+@model web.ViewModels.ThemeSettingsViewModel
+
+@{
+    var themeNames = Model.Themes.Select(t => t.Name).Distinct().OrderBy(n => n).ToList();
+    var lightByName = Model.Themes.Where(t => t.ThemeMode == ThemeMode.Light).ToDictionary(t => t.Name);
+    var darkByName = Model.Themes.Where(t => t.ThemeMode == ThemeMode.Dark).ToDictionary(t => t.Name);
+}
+
+<form asp-action="UpdateThemeSelection" method="post" class="theme-form">
+    @Html.AntiForgeryToken()
+    <div class="card mb-4">
+        <div class="card-header"><strong>Tema</strong></div>
+        <div class="card-body">
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <label class="form-label">Aktiv tema tilstand</label>
+                    <select name="ActiveThemeMode" class="form-select">
+                        @foreach (var mode in ThemeMode.AllModes)
+                        {
+                            <option value="@mode" selected="@(Model.ActiveThemeMode == mode)">@mode</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Farvetema</label>
+                    <select id="themeSelect" name="ActiveThemeName" class="form-select">
+                        @foreach (var name in themeNames)
+                        {
+                            var light = lightByName.GetValueOrDefault(name);
+                            var dark = darkByName.GetValueOrDefault(name);
+                            <option value="@name"
+                                    selected="@(Model.ActiveThemeName == name)"
+                                    data-light-primary="@light?.PrimaryColor"
+                                    data-light-background="@light?.BackgroundColor"
+                                    data-light-surface="@light?.SurfaceColor"
+                                    data-light-text="@light?.TextColor"
+                                    data-dark-primary="@dark?.PrimaryColor"
+                                    data-dark-background="@dark?.BackgroundColor"
+                                    data-dark-surface="@dark?.SurfaceColor"
+                                    data-dark-text="@dark?.TextColor">@name</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <h6 class="theme-category-title"><i class="bi bi-sun me-1"></i> Lyst</h6>
+                    <div id="lightSwatches" class="d-flex gap-2">
+                        <span class="theme-swatch" data-swatch="primary" title="Primary"></span>
+                        <span class="theme-swatch" data-swatch="background" title="Background"></span>
+                        <span class="theme-swatch" data-swatch="surface" title="Surface"></span>
+                        <span class="theme-swatch" data-swatch="text" title="Text"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="theme-category-title"><i class="bi bi-moon-stars me-1"></i> Mørkt</h6>
+                    <div id="darkSwatches" class="d-flex gap-2">
+                        <span class="theme-swatch" data-swatch="primary" title="Primary"></span>
+                        <span class="theme-swatch" data-swatch="background" title="Background"></span>
+                        <span class="theme-swatch" data-swatch="surface" title="Surface"></span>
+                        <span class="theme-swatch" data-swatch="text" title="Text"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer">
+            <button type="submit" class="btn btn-primary mb-2">
+                <i class="bi bi-floppy2 me-1"></i> Gem
+            </button>
+        </div>
+    </div>
+</form>
+
+<style>
+    .theme-swatch {
+        display: inline-block;
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: .375rem;
+        border: 1px solid var(--clr-border, #dee2e6);
+    }
+
+    .theme-category-title {
+        color: var(--clr-text);
+        font-weight: 600;
+    }
+</style>
+
+<script>
+    (() => {
+        const select = document.getElementById('themeSelect');
+        if (!select) return;
+
+        const updateSwatches = (containerId, prefix) => {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            const option = select.options[select.selectedIndex];
+            if (!option) return;
+            container.querySelectorAll('[data-swatch]').forEach((el) => {
+                const key = el.getAttribute('data-swatch');
+                el.style.backgroundColor = option.dataset[prefix + key.charAt(0).toUpperCase() + key.slice(1)] || '';
+            });
+        };
+
+        const update = () => {
+            updateSwatches('lightSwatches', 'light');
+            updateSwatches('darkSwatches', 'dark');
+        };
+
+        select.addEventListener('change', update);
+        update();
+
+        document.querySelectorAll('.theme-form').forEach((form) => {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.disabled = true;
+                const data = await window.FvForm.submit(form);
+                if (submitBtn) submitBtn.disabled = false;
+                if (data.success) {
+                    const link = document.getElementById('themeStylesheet');
+                    if (link) link.href = link.href.split('?')[0] + '?v=' + Date.now();
+                }
+            });
+        });
+    })();
+</script>

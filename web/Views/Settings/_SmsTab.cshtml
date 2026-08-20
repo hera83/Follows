@@ -1,0 +1,794 @@
+@model web.ViewModels.SmsSettingsViewModel
+
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <i class="bi @(Model.IsOnline ? "bi-check-circle-fill text-success" : "bi-x-circle-fill text-danger") fs-3"></i>
+                <div>
+                    <div class="sms-card-label">@(Model.IsOnline ? "Online" : "Offline")</div>
+                    <div class="text-muted small">
+                        @if (!Model.IsOnline)
+                        {
+                            <text>@(Model.ErrorMessage ?? "Kunne ikke forbinde til SMS-gatewayen.")</text>
+                        }
+                        else
+                        {
+                            <text>SMS-gateway</text>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="sms-card-label mb-1">Saldo</div>
+                <div class="text-muted small">
+                    @(Model.BalanceDkk is null ? "–" : Model.BalanceDkk.Value.ToString("0.00") + " kr.")
+                    @if (Model.BalanceUpdatedAtUtc.HasValue)
+                    {
+                        <text> (opdateret @Model.BalanceUpdatedAtUtc.Value.ToLocalTime().ToString("g"))</text>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="sms-card-label mb-1">Pris pr. sms</div>
+                <div class="text-muted small">
+                    @(Model.CurrentPriceDkk is null ? "–" : Model.CurrentPriceDkk.Value.ToString("0.00") + " kr.")
+                    @if (Model.CurrentPriceUpdatedAtUtc.HasValue)
+                    {
+                        <text> (opdateret @Model.CurrentPriceUpdatedAtUtc.Value.ToLocalTime().ToString("g"))</text>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .sms-card-label {
+        color: var(--clr-text);
+        font-weight: 600;
+    }
+</style>
+
+<div data-table-root id="smsTableRoot" data-table-endpoint="@Url.Action("SmsTable")">
+    <div class="table-toolbar mb-3">
+        <div class="table-toolbar-start">
+            <button class="btn btn-icon btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#smsFilterPanel" title="Filtre" aria-label="Filtre">
+                <i class="bi bi-funnel"></i>
+            </button>
+            <div class="table-search">
+                <i class="bi bi-search"></i>
+                <input type="search" class="form-control" placeholder="Søg telefonnummer, besked eller status..." data-table-search autocomplete="off" />
+            </div>
+        </div>
+        <div class="table-toolbar-end">
+            <button class="btn btn-secondary" type="button" data-bs-toggle="modal" data-bs-target="#smsSubscriberNumbersModal" title="Modtagernumre" aria-label="Modtagernumre">
+                <i class="bi bi-person-lines-fill"></i> Modtagernumre
+            </button>
+            <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#sendSmsModal" title="Send sms" aria-label="Send sms">
+                <i class="bi bi-send"></i> Send sms
+            </button>
+        </div>
+    </div>
+
+    <div class="collapse mb-3" id="smsFilterPanel">
+        <div class="table-filter-panel" data-table-filter-panel>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Retning</label>
+                    <select class="form-select" name="Direction">
+                        <option value="">Alle</option>
+                        <option value="@web.Constants.SmsDirection.Outbound">Udgående</option>
+                        <option value="@web.Constants.SmsDirection.Inbound">Indgående</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end gap-2">
+                    <button type="button" class="btn btn-primary btn-icon" data-table-filter-save title="Gem filtre" aria-label="Gem filtre">
+                        <i class="bi bi-floppy2"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-icon" data-table-filter-reset title="Nulstil filtre" aria-label="Nulstil filtre">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div data-table-region>
+        @await Html.PartialAsync("_SmsTableBody", Model.Messages)
+    </div>
+</div>
+
+<!-- Send sms modal -->
+<div class="modal fade" id="sendSmsModal" tabindex="-1" aria-labelledby="sendSmsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form asp-action="SendSms" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <h5 class="modal-title" id="sendSmsModalLabel"><i class="bi bi-send me-2"></i>Send sms</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Telefonnummer</label>
+                            <select name="To" id="sendSmsTo" class="form-select" required>
+                                <option value="">Vælg modtager...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Besked</label>
+                            <textarea name="Message" class="form-control" rows="4" maxlength="1000" required></textarea>
+                        </div>
+                    </div>
+                    <div class="form-text">Sms'en lægges i kø og afsendes af baggrundsjobbet inden for kort tid.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i> Annuller
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-floppy2 me-1"></i> Gem
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Vis sms modal -->
+<div class="modal fade" id="viewSmsModal" tabindex="-1" aria-labelledby="viewSmsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header d-flex align-items-center gap-2">
+                <h5 class="modal-title flex-grow-1 mb-0" id="viewSmsModalLabel"><i class="bi bi-chat-text me-2"></i>Sms</h5>
+                <button type="button" class="btn btn-sm btn-primary flex-shrink-0" id="viewSmsReplyBtn" title="Besvar" aria-label="Besvar">
+                    <i class="bi bi-reply me-1"></i> Besvar
+                </button>
+                <button type="button" class="btn-close flex-shrink-0" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body">
+                <dl class="row small text-muted mb-3">
+                    <dt class="col-sm-3">Retning</dt>
+                    <dd class="col-sm-9" id="viewSmsDirection"></dd>
+                    <dt class="col-sm-3">Telefonnummer</dt>
+                    <dd class="col-sm-9" id="viewSmsPhoneNumber"></dd>
+                    <dt class="col-sm-3">Status</dt>
+                    <dd class="col-sm-9" id="viewSmsStatus"></dd>
+                    <dt class="col-sm-3">Segmenter / pris</dt>
+                    <dd class="col-sm-9" id="viewSmsPrice"></dd>
+                    <dt class="col-sm-3">Oprettet</dt>
+                    <dd class="col-sm-9" id="viewSmsCreatedAt"></dd>
+                    <dt class="col-sm-3 d-none" id="viewSmsFailureReasonLabel">Fejl</dt>
+                    <dd class="col-sm-9 d-none" id="viewSmsFailureReason"></dd>
+                </dl>
+                <div class="p-3 border rounded" id="viewSmsBody" style="white-space: pre-wrap; border-color: var(--clr-border, #dee2e6) !important;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Slet sms modal -->
+<div class="modal fade" id="deleteSmsModal" tabindex="-1" aria-labelledby="deleteSmsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteSmsModalLabel"><i class="bi bi-trash me-2"></i>Slet sms</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body">
+                Er du sikker på, at du vil slette sms'en til <strong id="deleteSmsPhoneNumber"></strong>? Hvis den endnu ikke er sendt, annulleres den i SMS-gatewayen. Denne handling kan ikke fortrydes.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i> Annuller
+                </button>
+                <form asp-action="DeleteSms" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" id="deleteSmsId" />
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash me-1"></i> Slet
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Send sms igen modal -->
+<div class="modal fade" id="retrySmsModal" tabindex="-1" aria-labelledby="retrySmsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="retrySmsModalLabel"><i class="bi bi-arrow-repeat me-2"></i>Send igen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body">
+                Vil du lægge sms'en til <strong id="retrySmsPhoneNumber"></strong> i kø til afsendelse igen?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i> Annuller
+                </button>
+                <form asp-action="RetrySms" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" id="retrySmsId" />
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-arrow-repeat me-1"></i> Send igen
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modtagernumre modal -->
+<div class="modal fade" id="smsSubscriberNumbersModal" tabindex="-1" aria-labelledby="smsSubscriberNumbersModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="smsSubscriberNumbersModalLabel"><i class="bi bi-person-lines-fill me-2"></i>Modtagernumre</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body">
+                <div id="smsSubscriberNumbersLoading" class="text-center text-muted py-5">
+                    <span class="spinner-border spinner-border-sm me-2"></span>Indlæser numre fra SMS-gatewayen...
+                </div>
+                <div id="smsSubscriberNumbersError" class="text-danger d-none"></div>
+
+                <form id="smsSubscriberNumbersForm" asp-action="SaveSmsSubscriberNumbers" method="post" class="d-none">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="SubscriptionId" id="smsSubscriberNumbersId" />
+                    <div id="smsSubscriberNumbersHiddenInputs"></div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Liste</label>
+                        <select class="form-select" id="smsSubscriberNumbersListSelect"></select>
+                    </div>
+
+                    <div class="form-text mb-3">
+                        Numrene hentes direkte fra SMS-gatewayen og gemmes ikke lokalt. En key kan have flere lister (fx udløbne eller fremtidige) - vælg hvilken liste du vil redigere, eller opret en ny. Et nummer kan ikke tilføjes, hvis det allerede er registreret til en anden nøgle i gatewayen.
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Startdato</label>
+                            <input type="date" name="StartDate" id="smsSubscriberNumbersStartDate" class="form-control" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Slutdato</label>
+                            <input type="date" name="EndDate" id="smsSubscriberNumbersEndDate" class="form-control" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Webhook-url</label>
+                            <input type="url" name="WebhookUrl" id="smsSubscriberNumbersWebhookUrl" class="form-control" placeholder="(valgfri)" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mb-3">
+                        <input type="tel" id="smsSubscriberNumberInput" class="form-control" placeholder="Nyt telefonnummer..." autocomplete="off" />
+                        <button type="button" class="btn btn-secondary btn-icon flex-shrink-0" id="smsSubscriberNumberAddBtn" title="Tilføj nummer" aria-label="Tilføj nummer">
+                            <i class="bi bi-plus-lg"></i>
+                        </button>
+                    </div>
+
+                    <div class="table-toolbar mb-2">
+                        <div class="table-toolbar-start">
+                            <div class="table-search">
+                                <i class="bi bi-search"></i>
+                                <input type="search" class="form-control" id="smsSubscriberNumbersSearch" placeholder="Søg telefonnummer..." autocomplete="off" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Telefonnummer</th>
+                                    <th class="text-end" style="width: 1%;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="smsSubscriberNumbersTableBody"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="table-footer">
+                        <p class="table-footer-count" id="smsSubscriberNumbersFooterCount"></p>
+                        <div class="table-footer-end">
+                            <span class="table-pagesize-label">Pr. side</span>
+                            <select class="table-pagesize" id="smsSubscriberNumbersPageSize" aria-label="Pr. side">
+                                <option value="10">10</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                            <div id="smsSubscriberNumbersPagination"></div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i> Annuller
+                </button>
+                <button type="submit" form="smsSubscriberNumbersForm" class="btn btn-primary" id="smsSubscriberNumbersSaveBtn">
+                    <i class="bi bi-floppy2 me-1"></i> Gem
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // En subscriptions periode er aktiv, når IsActive er sat og dags dato ligger
+    // mellem StartDate og EndDate (begge ISO yyyy-MM-dd, så de kan sammenlignes
+    // som strenge). Bruges til at afgrænse hvilke numre der kan vælges som
+    // modtager, uden at numre fra udløbne/fremtidige lister kommer i spil.
+    const isSmsSubscriptionPeriodActive = (sub) => {
+        if (!sub.isActive) return false;
+        const today = new Date().toISOString().slice(0, 10);
+        return sub.startDate <= today && today <= sub.endDate;
+    };
+
+    // Sat af "Besvar"-knappen i vis-sms-popup'en, lige før den åbner sendSmsModal
+    // programmatisk (hvor der ikke er et relatedTarget at læse data-reply-number
+    // fra). Bruges som fallback i sendSmsModal's show.bs.modal-håndtering.
+    let pendingSmsReplyNumber = '';
+
+    (() => {
+        const smsRoot = document.getElementById('smsTableRoot');
+
+        const sendSmsModal = document.getElementById('sendSmsModal');
+        const form = sendSmsModal?.querySelector('form');
+        const sendSmsTo = document.getElementById('sendSmsTo');
+
+        const populateSendSmsTo = (numbers, placeholder) => {
+            sendSmsTo.innerHTML = '';
+            const placeholderOption = document.createElement('option');
+            placeholderOption.value = '';
+            placeholderOption.textContent = placeholder;
+            sendSmsTo.appendChild(placeholderOption);
+
+            numbers.forEach((n) => {
+                const option = document.createElement('option');
+                option.value = n;
+                option.textContent = n;
+                sendSmsTo.appendChild(option);
+            });
+        };
+
+        // Modtagernumre hentes live fra SMS-gatewayen, hver gang popup'en åbnes,
+        // i stedet for at lade brugeren skrive et nummer manuelt. Åbnes popup'en
+        // via en "Besvar"-knap, forudvælges dens nummer, hvis det findes på den
+        // aktive modtagerliste.
+        sendSmsModal?.addEventListener('show.bs.modal', async (event) => {
+            const replyNumber = event.relatedTarget?.dataset.replyNumber || pendingSmsReplyNumber || '';
+            pendingSmsReplyNumber = '';
+
+            form.reset();
+            populateSendSmsTo([], 'Henter numre...');
+            sendSmsTo.disabled = true;
+
+            try {
+                const res = await fetch('@Url.Action("SmsSubscriberNumbers")', { headers: { 'X-Requested-With': 'fetch' } });
+                if (!res.ok) throw new Error('fetch failed');
+                const data = await res.json();
+                const numbers = [...new Set(
+                    (data.subscriptions || [])
+                        .filter(isSmsSubscriptionPeriodActive)
+                        .flatMap((s) => s.phoneNumbers || [])
+                )];
+                populateSendSmsTo(numbers, numbers.length === 0 ? 'Ingen modtagernumre registreret' : 'Vælg modtager...');
+
+                if (replyNumber) {
+                    if (numbers.includes(replyNumber)) {
+                        sendSmsTo.value = replyNumber;
+                    } else {
+                        window.FvToast?.show('warning', 'Nummeret er ikke på den aktive modtagerliste - vælg venligst manuelt.');
+                    }
+                }
+            } catch {
+                populateSendSmsTo([], 'Kunne ikke hente numre');
+            } finally {
+                sendSmsTo.disabled = false;
+            }
+        });
+
+        form?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.disabled = true;
+            const data = await window.FvForm.submit(form);
+            if (submitBtn) submitBtn.disabled = false;
+            if (data.success) {
+                bootstrap.Modal.getInstance(sendSmsModal)?.hide();
+                form.reset();
+                window.FvDataTable?.reload(smsRoot);
+            }
+        });
+
+        // Genindlæser sms-tabellen hvert 3. sekund, mens Sms-fanen er aktiv, så
+        // status (fx Queued -> Sent/Failed) opdateres uden en manuel genindlæsning.
+        // Stille opdatering: DOM'en rammes kun, hvis svaret er anderledes end det,
+        // der allerede vises, så tabellen ikke "hopper" midt i en interaktion.
+        const smsPane = smsRoot?.closest('.tab-pane');
+        const smsTabButton = document.getElementById('sms-tab');
+
+        if (smsPane) {
+            if (smsPane._smsRefreshInterval) clearInterval(smsPane._smsRefreshInterval);
+            smsPane._smsRefreshInterval = setInterval(() => {
+                window.FvDataTable?.reload(smsRoot, { silent: true });
+            }, 3000);
+
+            smsTabButton?.addEventListener('hidden.bs.tab', () => {
+                clearInterval(smsPane._smsRefreshInterval);
+                smsPane._smsRefreshInterval = null;
+            }, { once: true });
+        }
+    })();
+
+    // Vis/slet/send-igen for en enkelt sms-række. Vis-popup'en udfyldes fra
+    // data-attributter på den klikkede knap (data allerede i DOM'en fra
+    // tabel-rækken), så der ikke skal hentes noget ekstra. "Besvar" derfra
+    // lukker vis-popup'en først og åbner derefter sendSmsModal - to Bootstrap-
+    // modaler kan ikke vises pænt samtidig.
+    (() => {
+        const smsRoot = document.getElementById('smsTableRoot');
+
+        const handleAjaxSubmit = (form, modalEl) => {
+            if (!form) return;
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.disabled = true;
+                const data = await window.FvForm.submit(form);
+                if (submitBtn) submitBtn.disabled = false;
+                if (data.success) {
+                    if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+                    window.FvDataTable?.reload(smsRoot);
+                }
+            });
+        };
+
+        const viewSmsModal = document.getElementById('viewSmsModal');
+        let currentViewSms = null;
+
+        viewSmsModal?.addEventListener('show.bs.modal', (event) => {
+            const btn = event.relatedTarget;
+            if (!btn) return;
+
+            currentViewSms = { phoneNumber: btn.dataset.phonenumber || '' };
+
+            document.getElementById('viewSmsDirection').textContent =
+                btn.dataset.direction === '@web.Constants.SmsDirection.Outbound' ? 'Udgående' : 'Indgående';
+            document.getElementById('viewSmsPhoneNumber').textContent = btn.dataset.phonenumber || '';
+            document.getElementById('viewSmsStatus').textContent = btn.dataset.status || '';
+            document.getElementById('viewSmsBody').textContent = btn.dataset.body || '';
+
+            const totalPrice = btn.dataset.totalprice;
+            document.getElementById('viewSmsPrice').textContent =
+                `${btn.dataset.segmentcount || '0'} / ${totalPrice ? parseFloat(totalPrice).toFixed(2) + ' kr.' : '–'}`;
+
+            const createdAt = btn.dataset.createdat;
+            document.getElementById('viewSmsCreatedAt').textContent = createdAt ? new Date(createdAt).toLocaleString('da-DK') : '';
+
+            const failureReason = btn.dataset.failurereason || '';
+            document.getElementById('viewSmsFailureReasonLabel').classList.toggle('d-none', !failureReason);
+            document.getElementById('viewSmsFailureReason').classList.toggle('d-none', !failureReason);
+            document.getElementById('viewSmsFailureReason').textContent = failureReason;
+        });
+
+        document.getElementById('viewSmsReplyBtn')?.addEventListener('click', () => {
+            if (!currentViewSms) return;
+
+            viewSmsModal.addEventListener('hidden.bs.modal', () => {
+                pendingSmsReplyNumber = currentViewSms.phoneNumber;
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('sendSmsModal')).show();
+            }, { once: true });
+
+            bootstrap.Modal.getInstance(viewSmsModal)?.hide();
+        });
+
+        const deleteSmsModal = document.getElementById('deleteSmsModal');
+        handleAjaxSubmit(deleteSmsModal?.querySelector('form'), deleteSmsModal);
+        deleteSmsModal?.addEventListener('show.bs.modal', (event) => {
+            const btn = event.relatedTarget;
+            if (!btn) return;
+            document.getElementById('deleteSmsId').value = btn.dataset.id;
+            document.getElementById('deleteSmsPhoneNumber').textContent = btn.dataset.phonenumber || '';
+        });
+
+        const retrySmsModal = document.getElementById('retrySmsModal');
+        handleAjaxSubmit(retrySmsModal?.querySelector('form'), retrySmsModal);
+        retrySmsModal?.addEventListener('show.bs.modal', (event) => {
+            const btn = event.relatedTarget;
+            if (!btn) return;
+            document.getElementById('retrySmsId').value = btn.dataset.id;
+            document.getElementById('retrySmsPhoneNumber').textContent = btn.dataset.phonenumber || '';
+        });
+    })();
+
+    // Modtagernumre: henter den aktuelle nøgles abonnement (numre + periode +
+    // webhook) live fra SMS-gatewayen hver gang popup'en åbnes, da listen ikke
+    // gemmes i app-databasen. Gem kan fejle hvis et nummer allerede tilhører en
+    // anden nøgle i gatewayen - det vises som en almindelig fejl-toast.
+    (() => {
+        const modal = document.getElementById('smsSubscriberNumbersModal');
+        const loadingEl = document.getElementById('smsSubscriberNumbersLoading');
+        const errorEl = document.getElementById('smsSubscriberNumbersError');
+        const form = document.getElementById('smsSubscriberNumbersForm');
+        const tableBody = document.getElementById('smsSubscriberNumbersTableBody');
+        const hiddenInputsContainer = document.getElementById('smsSubscriberNumbersHiddenInputs');
+        const numberInput = document.getElementById('smsSubscriberNumberInput');
+        const searchInput = document.getElementById('smsSubscriberNumbersSearch');
+        const pageSizeSelect = document.getElementById('smsSubscriberNumbersPageSize');
+        const footerCountEl = document.getElementById('smsSubscriberNumbersFooterCount');
+        const paginationEl = document.getElementById('smsSubscriberNumbersPagination');
+        const listSelect = document.getElementById('smsSubscriberNumbersListSelect');
+
+        // Listen er hentet i sin helhed fra gatewayen (ikke server-pagineret), så
+        // søgning/sidedeling foregår lokalt i browseren over den fulde liste, mens
+        // PhoneNumbers-hidden-inputs altid afspejler hele listen, uanset hvilken
+        // side der vises - ellers ville et "Gem" tabe numre fra andre sider.
+        // En key kan have flere lister hos gatewayen (fx udløbne/fremtidige), så
+        // alle hentes på én gang og vælges mellem via listSelect.
+        let subscriptionsData = [];
+        let numbers = [];
+        let searchTerm = '';
+        let page = 1;
+        let pageSize = 10;
+
+        const todayIso = () => new Date().toISOString().slice(0, 10);
+
+        const formatStatus = (sub) => {
+            if (!sub.isActive) return 'Inaktiv';
+            const today = todayIso();
+            if (sub.endDate < today) return 'Udløbet';
+            if (sub.startDate > today) return 'Fremtidig';
+            return 'Aktiv';
+        };
+
+        const formatOptionLabel = (sub) =>
+            `${sub.startDate} – ${sub.endDate} (${formatStatus(sub)}, ${(sub.phoneNumbers || []).length} numre)`;
+
+        const populateListSelect = () => {
+            listSelect.innerHTML = '';
+            subscriptionsData.forEach((sub, index) => {
+                const option = document.createElement('option');
+                option.value = String(index);
+                option.textContent = formatOptionLabel(sub);
+                listSelect.appendChild(option);
+            });
+
+            const newOption = document.createElement('option');
+            newOption.value = 'new';
+            newOption.textContent = '+ Ny liste';
+            listSelect.appendChild(newOption);
+        };
+
+        const loadSelected = (value) => {
+            if (value === 'new') {
+                const start = new Date();
+                const end = new Date();
+                end.setFullYear(end.getFullYear() + 1);
+
+                document.getElementById('smsSubscriberNumbersId').value = '';
+                document.getElementById('smsSubscriberNumbersStartDate').value = start.toISOString().slice(0, 10);
+                document.getElementById('smsSubscriberNumbersEndDate').value = end.toISOString().slice(0, 10);
+                document.getElementById('smsSubscriberNumbersWebhookUrl').value = '';
+                setNumbers([]);
+                return;
+            }
+
+            const sub = subscriptionsData[parseInt(value, 10)];
+            if (!sub) return;
+
+            document.getElementById('smsSubscriberNumbersId').value = sub.subscriptionId || '';
+            document.getElementById('smsSubscriberNumbersStartDate').value = sub.startDate || '';
+            document.getElementById('smsSubscriberNumbersEndDate').value = sub.endDate || '';
+            document.getElementById('smsSubscriberNumbersWebhookUrl').value = sub.webhookUrl || '';
+            setNumbers(sub.phoneNumbers || []);
+        };
+
+        listSelect.addEventListener('change', () => loadSelected(listSelect.value));
+
+        const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+        const buildPageNumbers = (currentPage, totalPages, siblingCount = 1) => {
+            const pages = [];
+            if (totalPages <= 0) return pages;
+
+            const windowStart = Math.max(1, currentPage - siblingCount);
+            const windowEnd = Math.min(totalPages, currentPage + siblingCount);
+
+            pages.push(1);
+            if (windowStart > 2) pages.push(null);
+            for (let p = Math.max(2, windowStart); p <= Math.min(totalPages - 1, windowEnd); p++) pages.push(p);
+            if (windowEnd < totalPages - 1) pages.push(null);
+            if (totalPages > 1) pages.push(totalPages);
+
+            return pages;
+        };
+
+        const buildPaginationHtml = (currentPage, totalPages) => {
+            const items = buildPageNumbers(currentPage, totalPages).map((p) => p === null
+                ? '<li class="page-item disabled"><span class="page-link">&hellip;</span></li>'
+                : `<li class="page-item ${p === currentPage ? 'active' : ''}"><button type="button" class="page-link" data-table-page="${p}">${p}</button></li>`
+            ).join('');
+
+            return `
+                <nav aria-label="Sider">
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}">
+                            <button type="button" class="page-link" data-table-page="${currentPage - 1}" ${currentPage <= 1 ? 'disabled' : ''}>
+                                <i class="bi bi-chevron-left me-1"></i>Forrige
+                            </button>
+                        </li>
+                        ${items}
+                        <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}">
+                            <button type="button" class="page-link" data-table-page="${currentPage + 1}" ${currentPage >= totalPages ? 'disabled' : ''}>
+                                Næste<i class="bi bi-chevron-right ms-1"></i>
+                            </button>
+                        </li>
+                    </ul>
+                </nav>`;
+        };
+
+        const rebuildHiddenInputs = () => {
+            hiddenInputsContainer.innerHTML = '';
+            numbers.forEach((n) => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'PhoneNumbers';
+                input.value = n;
+                hiddenInputsContainer.appendChild(input);
+            });
+        };
+
+        const render = () => {
+            const term = searchTerm.trim().toLowerCase();
+            const filtered = term ? numbers.filter((n) => n.toLowerCase().includes(term)) : numbers;
+            const totalCount = filtered.length;
+            const totalPages = totalCount === 0 ? 0 : Math.ceil(totalCount / pageSize);
+            page = Math.min(Math.max(page, 1), Math.max(totalPages, 1));
+            const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
+
+            tableBody.innerHTML = pageItems.length === 0
+                ? '<tr><td colspan="2" class="text-muted">Ingen modtagernumre fundet.</td></tr>'
+                : pageItems.map((n) => `
+                    <tr>
+                        <td>${escapeHtml(n)}</td>
+                        <td class="text-end">
+                            <button type="button" class="btn btn-sm btn-outline-danger btn-icon" data-remove-number="${escapeHtml(n)}" title="Fjern nummer" aria-label="Fjern nummer">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>`
+                ).join('');
+
+            footerCountEl.textContent = totalCount === 0
+                ? 'Ingen resultater'
+                : `Viser ${((page - 1) * pageSize) + 1}-${Math.min(page * pageSize, totalCount)} af ${totalCount}`;
+
+            paginationEl.innerHTML = totalPages > 1 ? buildPaginationHtml(page, totalPages) : '';
+        };
+
+        const setNumbers = (newNumbers) => {
+            numbers = [...newNumbers];
+            page = 1;
+            rebuildHiddenInputs();
+            render();
+        };
+
+        const addNumberFromInput = () => {
+            const value = numberInput.value.trim();
+            if (!value) return;
+
+            if (numbers.includes(value)) {
+                window.FvToast?.show('warning', 'Nummeret er allerede på listen.');
+            } else {
+                numbers.push(value);
+                rebuildHiddenInputs();
+                searchTerm = '';
+                searchInput.value = '';
+                page = Math.max(1, Math.ceil(numbers.length / pageSize));
+                render();
+            }
+
+            numberInput.value = '';
+            numberInput.focus();
+        };
+
+        const removeNumber = (value) => {
+            numbers = numbers.filter((n) => n !== value);
+            rebuildHiddenInputs();
+            render();
+        };
+
+        document.getElementById('smsSubscriberNumberAddBtn')?.addEventListener('click', addNumberFromInput);
+        numberInput?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addNumberFromInput();
+            }
+        });
+
+        tableBody.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-remove-number]');
+            if (!btn) return;
+            removeNumber(btn.dataset.removeNumber);
+        });
+
+        paginationEl.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-table-page]');
+            if (!btn || btn.disabled) return;
+            page = parseInt(btn.dataset.tablePage, 10);
+            render();
+        });
+
+        pageSizeSelect.addEventListener('change', () => {
+            pageSize = parseInt(pageSizeSelect.value, 10) || 10;
+            page = 1;
+            render();
+        });
+
+        let searchDebounceTimer;
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchDebounceTimer);
+            searchDebounceTimer = setTimeout(() => {
+                searchTerm = searchInput.value;
+                page = 1;
+                render();
+            }, 300);
+        });
+
+        modal?.addEventListener('show.bs.modal', async () => {
+            form.classList.add('d-none');
+            errorEl.classList.add('d-none');
+            loadingEl.classList.remove('d-none');
+            numberInput.value = '';
+            searchInput.value = '';
+            searchTerm = '';
+            pageSizeSelect.value = '10';
+            pageSize = 10;
+            setNumbers([]);
+
+            try {
+                const res = await fetch('@Url.Action("SmsSubscriberNumbers")', { headers: { 'X-Requested-With': 'fetch' } });
+                if (!res.ok) throw new Error('fetch failed');
+                const data = await res.json();
+
+                subscriptionsData = data.subscriptions || [];
+                populateListSelect();
+                loadSelected(listSelect.value);
+
+                form.classList.remove('d-none');
+            } catch {
+                errorEl.textContent = 'Kunne ikke hente modtagernumre fra SMS-gatewayen.';
+                errorEl.classList.remove('d-none');
+            } finally {
+                loadingEl.classList.add('d-none');
+            }
+        });
+
+        form?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const saveBtn = document.getElementById('smsSubscriberNumbersSaveBtn');
+            if (saveBtn) saveBtn.disabled = true;
+            const data = await window.FvForm.submit(form);
+            if (saveBtn) saveBtn.disabled = false;
+            if (data.success) {
+                bootstrap.Modal.getInstance(modal)?.hide();
+            }
+        });
+    })();
+</script>

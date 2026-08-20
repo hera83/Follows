@@ -1,0 +1,284 @@
+@model web.ViewModels.DocumentGroupDetailViewModel
+@using web.Constants
+
+<div>
+    <a asp-action="Index" class="doc-back-link"><i class="bi bi-arrow-left me-1"></i>Documents</a>
+
+    <div class="page-header">
+        <h1><i class="bi bi-folder2-open me-2"></i><span id="documentGroupName">@Model.Name</span></h1>
+        <p id="documentGroupDescription" class="@(string.IsNullOrWhiteSpace(Model.Description) ? "d-none" : "")">@Model.Description</p>
+    </div>
+
+    <div class="table-toolbar mb-3">
+        <div class="table-toolbar-end">
+            @if (Model.CanManage)
+            {
+                <button class="btn btn-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#editDocumentGroupModal" title="Rediger gruppe" aria-label="Rediger gruppe">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-outline-danger btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#deleteDocumentGroupModal" title="Slet gruppe" aria-label="Slet gruppe">
+                    <i class="bi bi-trash"></i>
+                </button>
+            }
+            <button class="btn btn-primary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#uploadDocumentModal" title="Upload dokumenter" aria-label="Upload dokumenter">
+                <i class="bi bi-cloud-upload"></i>
+            </button>
+        </div>
+    </div>
+
+    <div id="documentsList" data-group-id="@Model.Id">
+        @await Html.PartialAsync("_DocumentsList", Model)
+    </div>
+</div>
+
+@if (Model.CanManage)
+{
+    <!-- Rediger gruppe -->
+    <div class="modal fade" id="editDocumentGroupModal" tabindex="-1" aria-labelledby="editDocumentGroupModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form asp-action="EditGroup" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="GroupId" value="@Model.Id" />
+                    <div class="modal-header">
+                        <h1 class="modal-title fs-5" id="editDocumentGroupModalLabel"><i class="bi bi-pencil me-2"></i>Rediger gruppe</h1>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Navn</label>
+                            <input name="Name" class="form-control" value="@Model.Name" required maxlength="@DocumentLimits.MaxGroupNameLength" />
+                        </div>
+                        <div class="mb-0">
+                            <label class="form-label">Beskrivelse (valgfri)</label>
+                            <textarea name="Description" class="form-control" rows="2" maxlength="@DocumentLimits.MaxGroupDescriptionLength">@Model.Description</textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Annuller</button>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-floppy me-1"></i>Gem</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slet gruppe -->
+    <div class="modal fade" id="deleteDocumentGroupModal" tabindex="-1" aria-labelledby="deleteDocumentGroupModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h1 class="modal-title fs-5" id="deleteDocumentGroupModalLabel"><i class="bi bi-exclamation-triangle text-danger me-2"></i>Slet gruppe</h1>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                </div>
+                <div class="modal-body">
+                    Er du sikker på, at du vil slette gruppen <strong>@Model.Name</strong>? Alle dokumenter i gruppen slettes også. Denne handling kan ikke fortrydes.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Annuller</button>
+                    <form asp-action="DeleteGroup" method="post" id="deleteDocumentGroupForm">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="groupId" value="@Model.Id" />
+                        <button type="submit" class="btn btn-danger"><i class="bi bi-trash me-1"></i>Slet</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Upload dokumenter -->
+<div class="modal fade" id="uploadDocumentModal" tabindex="-1" aria-labelledby="uploadDocumentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form asp-action="Upload" method="post" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="groupId" value="@Model.Id" />
+                <div class="modal-header">
+                    <h1 class="modal-title fs-5" id="uploadDocumentModalLabel"><i class="bi bi-cloud-upload me-2"></i>Upload dokumenter</h1>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label">Filer</label>
+                    <input type="file" name="files" class="form-control" multiple required
+                           accept=".pdf,.txt,.jpg,.jpeg,.png,.webp,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx" />
+                    <div class="form-text">Højst @DocumentLimits.MaxFilesPerUpload filer, max @(DocumentLimits.MaxFileBytes / 1024 / 1024) MB pr. fil. PDF, tekst, billeder, Word, Excel og PowerPoint understøttes.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Annuller</button>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="spinner-border spinner-border-sm me-1 d-none" data-upload-spinner></span>
+                        <i class="bi bi-cloud-upload me-1" data-upload-icon></i> Upload
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Slet dokument -->
+<div class="modal fade" id="deleteDocumentModal" tabindex="-1" aria-labelledby="deleteDocumentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="deleteDocumentModalLabel"><i class="bi bi-exclamation-triangle text-danger me-2"></i>Slet dokument</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body">
+                Er du sikker på, at du vil slette dokumentet <strong id="deleteDocumentName"></strong>? Denne handling kan ikke fortrydes.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Annuller</button>
+                <form asp-action="DeleteDocument" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="documentId" id="deleteDocumentInput" />
+                    <button type="submit" class="btn btn-danger"><i class="bi bi-trash me-1"></i>Slet</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Forhåndsvisning -->
+<div class="modal fade" id="documentPreviewModal" tabindex="-1" aria-labelledby="documentPreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="documentPreviewModalLabel">
+                    <i class="bi bi-file-earmark me-2" id="documentPreviewIcon"></i><span id="documentPreviewTitle"></span>
+                </h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body doc-preview-body" id="documentPreviewBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Luk</button>
+                <a class="btn btn-primary" id="documentPreviewDownload" download><i class="bi bi-download me-1"></i>Download</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (() => {
+            const groupId = document.getElementById('documentsList').dataset.groupId;
+            const listEl = document.getElementById('documentsList');
+
+            const refreshDocuments = async () => {
+                try {
+                    const res = await fetch(`@Url.Action("DocumentsList")?groupId=${encodeURIComponent(groupId)}`, { headers: { 'X-Requested-With': 'fetch' } });
+                    if (!res.ok) return;
+                    listEl.innerHTML = await res.text();
+                } catch { /* liste forbliver som den var */ }
+            };
+
+            const handleAjaxSubmit = (form, modalEl, options = {}) => {
+                if (!form) return;
+                form.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const submitBtn = form.querySelector('button[type="submit"]');
+                    const spinner = form.querySelector('[data-upload-spinner]');
+                    const icon = form.querySelector('[data-upload-icon]');
+                    if (submitBtn) submitBtn.disabled = true;
+                    spinner?.classList.remove('d-none');
+                    icon?.classList.add('d-none');
+                    const data = await window.FvForm.submit(form);
+                    if (submitBtn) submitBtn.disabled = false;
+                    spinner?.classList.add('d-none');
+                    icon?.classList.remove('d-none');
+                    if (data.success) {
+                        if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+                        if (options.resetOnSuccess !== false) form.reset();
+                        if (options.onSuccess) options.onSuccess(data);
+                        else await refreshDocuments();
+                    }
+                });
+            };
+
+            const uploadModal = document.getElementById('uploadDocumentModal');
+            handleAjaxSubmit(uploadModal?.querySelector('form'), uploadModal);
+
+            const deleteModal = document.getElementById('deleteDocumentModal');
+            handleAjaxSubmit(deleteModal?.querySelector('form'), deleteModal);
+            deleteModal?.addEventListener('show.bs.modal', (event) => {
+                const btn = event.relatedTarget;
+                if (!btn) return;
+                document.getElementById('deleteDocumentInput').value = btn.dataset.id;
+                document.getElementById('deleteDocumentName').textContent = btn.dataset.title;
+            });
+
+            // ─── Rediger/slet gruppe ─────────────────────────────────────────
+            const groupNameEl = document.getElementById('documentGroupName');
+            const groupDescEl = document.getElementById('documentGroupDescription');
+
+            const editGroupModal = document.getElementById('editDocumentGroupModal');
+            handleAjaxSubmit(editGroupModal?.querySelector('form'), editGroupModal, {
+                resetOnSuccess: false,
+                onSuccess: (data) => {
+                    groupNameEl.textContent = data.name;
+                    groupDescEl.textContent = data.description || '';
+                    groupDescEl.classList.toggle('d-none', !data.description);
+                }
+            });
+
+            const deleteGroupModal = document.getElementById('deleteDocumentGroupModal');
+            handleAjaxSubmit(deleteGroupModal?.querySelector('form'), deleteGroupModal, {
+                onSuccess: () => { window.location.href = '@Url.Action("Index")'; }
+            });
+
+            // ─── Forhåndsvisning ─────────────────────────────────────────────
+            const previewModal = document.getElementById('documentPreviewModal');
+            const previewBody = document.getElementById('documentPreviewBody');
+            const previewTitle = document.getElementById('documentPreviewTitle');
+            const previewIcon = document.getElementById('documentPreviewIcon');
+            const previewDownload = document.getElementById('documentPreviewDownload');
+
+            previewModal?.addEventListener('show.bs.modal', async (event) => {
+                const btn = event.relatedTarget;
+                if (!btn) return;
+
+                const id = btn.dataset.id;
+                const title = btn.dataset.title;
+                const contentType = btn.dataset.contentType;
+                const canPreview = btn.dataset.canPreview === 'true';
+                const viewUrl = `@Url.Action("View")/${id}`;
+
+                previewTitle.textContent = title;
+                previewIcon.className = `bi ${btn.dataset.icon || 'bi-file-earmark'} me-2`;
+                previewDownload.href = `@Url.Action("Download")/${id}`;
+                previewBody.innerHTML = '<div class="doc-preview-loading"><span class="spinner-border spinner-border-sm me-2"></span>Indlæser...</div>';
+
+                if (!canPreview) {
+                    previewBody.innerHTML = `
+                        <div class="doc-preview-fallback">
+                            <i class="bi bi-file-earmark-x"></i>
+                            <p>Forhåndsvisning er ikke tilgængelig for denne filtype.<br>Brug download-knappen for at åbne filen.</p>
+                        </div>`;
+                    return;
+                }
+
+                if (contentType === 'application/pdf') {
+                    previewBody.innerHTML = `<iframe src="${viewUrl}" class="doc-preview-iframe" title="${title}"></iframe>`;
+                } else if (contentType.startsWith('image/')) {
+                    previewBody.innerHTML = `<img src="${viewUrl}" class="doc-preview-image" alt="${title}" />`;
+                } else if (contentType === 'text/plain') {
+                    try {
+                        const res = await fetch(viewUrl, { headers: { 'X-Requested-With': 'fetch' } });
+                        const text = await res.text();
+                        const pre = document.createElement('pre');
+                        pre.className = 'doc-preview-text';
+                        pre.textContent = text; // aldrig innerHTML — undgår XSS fra filens indhold
+                        previewBody.innerHTML = '';
+                        previewBody.appendChild(pre);
+                    } catch {
+                        previewBody.innerHTML = '<div class="doc-preview-fallback"><p>Kunne ikke indlæse filen.</p></div>';
+                    }
+                }
+            });
+
+            previewModal?.addEventListener('hidden.bs.modal', () => {
+                previewBody.innerHTML = ''; // stopper evt. iframe-indlæsning
+            });
+        })();
+    </script>
+}

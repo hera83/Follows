@@ -1,0 +1,34 @@
+@model web.ViewModels.PaginationViewModel
+@using web.Infrastructure
+
+@if (Model.TotalPages > 1)
+{
+    var pages = PaginationHelper.BuildPageNumbers(Model.Page, Model.TotalPages);
+    <nav aria-label="Sider">
+        <ul class="pagination pagination-sm mb-0">
+            <li class="page-item @(Model.Page <= 1 ? "disabled" : string.Empty)">
+                <button type="button" class="page-link" data-table-page="@(Model.Page - 1)" disabled="@(Model.Page <= 1)">
+                    <i class="bi bi-chevron-left me-1"></i>Forrige
+                </button>
+            </li>
+            @foreach (var pageNumber in pages)
+            {
+                if (pageNumber is null)
+                {
+                    <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                }
+                else
+                {
+                    <li class="page-item @(pageNumber == Model.Page ? "active" : string.Empty)">
+                        <button type="button" class="page-link" data-table-page="@pageNumber">@pageNumber</button>
+                    </li>
+                }
+            }
+            <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : string.Empty)">
+                <button type="button" class="page-link" data-table-page="@(Model.Page + 1)" disabled="@(Model.Page >= Model.TotalPages)">
+                    Næste<i class="bi bi-chevron-right ms-1"></i>
+                </button>
+            </li>
+        </ul>
+    </nav>
+}

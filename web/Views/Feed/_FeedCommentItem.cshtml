@@ -1,0 +1,29 @@
+@model web.ViewModels.FeedCommentViewModel
+
+<div class="feed-comment" data-comment-id="@Model.Id">
+    <div class="feed-avatar feed-avatar-sm">
+        @if (Model.AuthorHasAvatar)
+        {
+            <img src="@Url.Action("Avatar", "Profile", new { userId = Model.AuthorId })" alt="@Model.AuthorDisplayName" />
+        }
+        else
+        {
+            <i class="bi bi-person-circle"></i>
+        }
+    </div>
+    <div class="feed-comment-bubble @(Model.IsTranslated ? "feed-translated" : "")">
+        <span class="feed-comment-author">@Model.AuthorDisplayName</span>
+        <span class="feed-comment-body">@Model.Body</span>
+        @if (Model.IsTranslated)
+        {
+            <span class="feed-translated-badge"><i class="bi bi-translate"></i> @Model.TranslatedLabel</span>
+        }
+    </div>
+    <time class="feed-time feed-comment-time" data-utc="@Model.CreatedAtUtc.ToString("o")">@Model.CreatedAtUtc.ToString("d. MMM HH:mm")</time>
+    @if (Model.CanDelete)
+    {
+        <button type="button" class="feed-delete-comment" data-comment-id="@Model.Id" title="Slet kommentar" aria-label="Slet kommentar">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    }
+</div>

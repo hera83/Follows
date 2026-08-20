@@ -1,0 +1,113 @@
+@using web.Constants
+@model web.ViewModels.SmsFilterViewModel
+
+<div class="table-responsive">
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Retning</th>
+                <th>Telefonnummer</th>
+                <th>Besked</th>
+                <th>Status</th>
+                <th>Segmenter</th>
+                <th>Pris</th>
+                <th>Oprettet</th>
+                <th class="text-end">Handlinger</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <tr>
+                    <td colspan="8" class="text-muted">Ingen sms'er fundet.</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var sms in Model.Items)
+                {
+                    <tr>
+                        <td>
+                            @if (sms.Direction == SmsDirection.Outbound)
+                            {
+                                <span class="badge-info"><i class="bi bi-arrow-up-right me-1"></i>Udgående</span>
+                            }
+                            else
+                            {
+                                <span class="badge-ok"><i class="bi bi-arrow-down-left me-1"></i>Indgående</span>
+                            }
+                        </td>
+                        <td>@sms.PhoneNumber</td>
+                        <td class="text-truncate" style="max-width: 320px;" title="@sms.Body">@sms.Body</td>
+                        <td>
+                            <span class="@(sms.Status switch
+                            {
+                                SmsMessageStatus.Failed => "badge-alarm",
+                                SmsMessageStatus.Pending => "badge-warn",
+                                _ => "badge-ok"
+                            })" title="@sms.FailureReason">@sms.Status</span>
+                        </td>
+                        <td>@sms.SegmentCount</td>
+                        <td>@(sms.TotalPriceDkk is null ? "–" : sms.TotalPriceDkk.Value.ToString("0.00") + " kr.")</td>
+                        <td>@sms.CreatedAtUtc.ToLocalTime().ToString("g")</td>
+                        <td class="text-end">
+                            <div class="d-inline-flex gap-1">
+                                <button class="btn btn-sm btn-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#sendSmsModal"
+                                        data-reply-number="@sms.PhoneNumber" title="Besvar" aria-label="Besvar">
+                                    <i class="bi bi-reply"></i>
+                                </button>
+                                @if (sms.Status == SmsMessageStatus.Queued || sms.Status == SmsMessageStatus.Failed)
+                                {
+                                    <button class="btn btn-sm btn-outline-danger btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#deleteSmsModal"
+                                            data-id="@sms.Id" data-phonenumber="@sms.PhoneNumber" title="Slet" aria-label="Slet">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                }
+                                @if (sms.Status == SmsMessageStatus.Failed)
+                                {
+                                    <button class="btn btn-sm btn-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#retrySmsModal"
+                                            data-id="@sms.Id" data-phonenumber="@sms.PhoneNumber" title="Send igen" aria-label="Send igen">
+                                        <i class="bi bi-arrow-repeat"></i>
+                                    </button>
+                                }
+                                <button class="btn btn-sm btn-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#viewSmsModal"
+                                        data-direction="@sms.Direction" data-phonenumber="@sms.PhoneNumber" data-body="@sms.Body"
+                                        data-status="@sms.Status" data-failurereason="@sms.FailureReason" data-segmentcount="@sms.SegmentCount"
+                                        data-totalprice="@sms.TotalPriceDkk" data-createdat="@sms.CreatedAtUtc.ToString("o")"
+                                        title="Vis" aria-label="Vis">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="table-footer">
+    <p class="table-footer-count">
+        @if (Model.TotalCount == 0)
+        {
+            <text>Ingen resultater</text>
+        }
+        else
+        {
+            <text>Viser @(((Model.Page - 1) * Model.PageSize) + 1)-@(Math.Min(Model.Page * Model.PageSize, Model.TotalCount)) af @Model.TotalCount</text>
+        }
+    </p>
+    <div class="table-footer-end">
+        <span class="table-pagesize-label">Pr. side</span>
+        <select class="table-pagesize" data-table-page-size aria-label="Pr. side">
+            <option value="10" selected="@(Model.PageSize == 10)">10</option>
+            <option value="50" selected="@(Model.PageSize == 50)">50</option>
+            <option value="100" selected="@(Model.PageSize == 100)">100</option>
+        </select>
+        @await Html.PartialAsync("~/Views/Shared/Partials/_Pagination.cshtml", new web.ViewModels.PaginationViewModel
+        {
+            Page = Model.Page,
+            TotalPages = (int)Math.Ceiling(Model.TotalCount / (double)Model.PageSize)
+        })
+    </div>
+</div>

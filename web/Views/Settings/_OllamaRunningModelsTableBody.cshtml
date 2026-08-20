@@ -1,0 +1,35 @@
+@using web.Infrastructure
+@model web.ViewModels.OllamaSettingsViewModel
+
+<div class="table-responsive">
+    <table class="table table-striped align-middle mb-0">
+        <thead>
+            <tr>
+                <th>Model</th>
+                <th>VRAM</th>
+                <th>Udløber</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.IsOnline)
+            {
+                <tr><td colspan="3" class="text-muted">Serveren er offline.</td></tr>
+            }
+            else if (Model.RunningModels.Count == 0)
+            {
+                <tr><td colspan="3" class="text-muted">Ingen modeller er aktive lige nu.</td></tr>
+            }
+            else
+            {
+                @foreach (var m in Model.RunningModels)
+                {
+                    <tr>
+                        <td>@m.Name <span class="badge-ok ms-1">Aktiv</span></td>
+                        <td>@ByteSizeFormatter.Format(m.SizeVram)</td>
+                        <td>@(m.ExpiresAt?.ToLocalTime().ToString("g") ?? "–")</td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>

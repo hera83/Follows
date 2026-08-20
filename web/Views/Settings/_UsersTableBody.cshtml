@@ -1,0 +1,94 @@
+@using web.Constants
+@model web.ViewModels.UserFilterViewModel
+
+<div class="table-responsive">
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Navn</th>
+                <th>Email</th>
+                <th>Telefon</th>
+                <th>Roller</th>
+                <th>Status</th>
+                <th>Oprettet</th>
+                <th class="text-end">Handlinger</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Users.Count == 0)
+            {
+                <tr>
+                    <td colspan="7" class="text-muted">Ingen brugere fundet.</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var user in Model.Users)
+                {
+                    var role = user.Roles.FirstOrDefault() ?? AppRoles.User;
+                    var isSelf = user.Id == Model.CurrentUserId;
+                    <tr>
+                        <td>@user.DisplayName</td>
+                        <td>@user.Email</td>
+                        <td>@(string.IsNullOrEmpty(user.PhoneNumber) ? "–" : user.PhoneNumber)</td>
+                        <td>
+                            @foreach (var roleLabel in user.Roles.Select(AppRoles.GetUILabel))
+                            {
+                                <span class="badge-info me-1">@roleLabel</span>
+                            }
+                        </td>
+                        <td>
+                            <span class="@(user.IsActive ? "badge-ok" : "badge-warn")">
+                                @(user.IsActive ? "Aktiv" : "Deaktiveret")
+                            </span>
+                        </td>
+                        <td>@user.CreatedAtUtc.ToLocalTime().ToString("g")</td>
+                        <td class="text-end">
+                            <div class="d-inline-flex gap-1">
+                                <button class="btn btn-sm btn-secondary" type="button" data-bs-toggle="modal" data-bs-target="#editUserModal"
+                                        data-id="@user.Id" data-email="@user.Email" data-displayname="@user.DisplayName"
+                                        data-phonenumber="@user.PhoneNumber" data-isactive="@user.IsActive.ToString().ToLowerInvariant()" data-role="@role"
+                                        disabled="@isSelf"
+                                        title="@(isSelf ? "Brug 'Min profil' for at redigere din egen bruger" : "Rediger")" aria-label="Rediger">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-sm btn-secondary" type="button" data-bs-toggle="modal" data-bs-target="#deleteUserModal"
+                                        data-id="@user.Id" data-name="@user.DisplayName"
+                                        disabled="@isSelf"
+                                        title="@(isSelf ? "Du kan ikke slette din egen bruger" : "Slet")" aria-label="Slet">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="table-footer">
+    <p class="table-footer-count">
+        @if (Model.TotalCount == 0)
+        {
+            <text>Ingen resultater</text>
+        }
+        else
+        {
+            <text>Viser @(((Model.Page - 1) * Model.PageSize) + 1)-@(Math.Min(Model.Page * Model.PageSize, Model.TotalCount)) af @Model.TotalCount</text>
+        }
+    </p>
+    <div class="table-footer-end">
+        <span class="table-pagesize-label">Pr. side</span>
+        <select class="table-pagesize" data-table-page-size aria-label="Pr. side">
+            <option value="10" selected="@(Model.PageSize == 10)">10</option>
+            <option value="50" selected="@(Model.PageSize == 50)">50</option>
+            <option value="100" selected="@(Model.PageSize == 100)">100</option>
+        </select>
+        @await Html.PartialAsync("~/Views/Shared/Partials/_Pagination.cshtml", new web.ViewModels.PaginationViewModel
+        {
+            Page = Model.Page,
+            TotalPages = (int)Math.Ceiling(Model.TotalCount / (double)Model.PageSize)
+        })
+    </div>
+</div>

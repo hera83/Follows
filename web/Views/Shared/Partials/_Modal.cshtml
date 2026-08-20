@@ -1,0 +1,21 @@
+@model web.ViewModels.ModalViewModel
+
+<div class="modal fade" id="@Model.Id" tabindex="-1" aria-labelledby="@Model.Id-Label" aria-hidden="true">
+    <div class="modal-dialog @Model.DialogCssClass">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="@Model.Id-Label">@Model.Title</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body">
+                @Html.Raw(Model.BodyHtml)
+            </div>
+            @if (!string.IsNullOrWhiteSpace(Model.FooterHtml))
+            {
+                <div class="modal-footer">
+                    @Html.Raw(Model.FooterHtml)
+                </div>
+            }
+        </div>
+    </div>
+</div>

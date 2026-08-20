@@ -1,0 +1,373 @@
+@model web.ViewModels.MailSettingsViewModel
+
+<div id="mailStatusCards">
+    @await Html.PartialAsync("_MailStatusCards", Model)
+</div>
+
+<style>
+    .mail-card-label {
+        color: var(--clr-text);
+        font-weight: 600;
+    }
+</style>
+
+<div data-table-root id="mailTableRoot" data-table-endpoint="@Url.Action("MailTable")">
+    <div class="table-toolbar mb-3">
+        <div class="table-toolbar-start">
+            <div class="table-search">
+                <i class="bi bi-search"></i>
+                <input type="search" class="form-control" placeholder="Søg afsender eller emne..." data-table-search autocomplete="off" />
+            </div>
+        </div>
+        <div class="table-toolbar-end">
+            <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#sendMailModal" title="Send mail" aria-label="Send mail">
+                <i class="bi bi-send"></i> Send mail
+            </button>
+        </div>
+    </div>
+
+    <div data-table-region>
+        @await Html.PartialAsync("_MailTableBody", Model.Messages)
+    </div>
+</div>
+
+<!-- Send mail modal -->
+<div class="modal fade" id="sendMailModal" tabindex="-1" aria-labelledby="sendMailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form asp-action="SendMail" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <h5 class="modal-title" id="sendMailModalLabel"><i class="bi bi-send me-2"></i>Send mail</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Til</label>
+                            <input name="To" type="text" class="form-control" placeholder="navn@eksempel.dk, navn2@eksempel.dk" required />
+                            <div class="form-text">Flere modtagere adskilles med komma.</div>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Emne</label>
+                            <input name="Subject" type="text" class="form-control" maxlength="200" required />
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Besked</label>
+                            <textarea name="Body" class="form-control" rows="6" maxlength="10000" required></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i> Annuller
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-send me-1"></i> Send
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Vis mail modal -->
+<div class="modal fade" id="viewMailModal" tabindex="-1" aria-labelledby="viewMailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header d-flex align-items-center gap-2">
+                <h5 class="modal-title text-truncate flex-grow-1 mb-0" id="viewMailModalLabel"><i class="bi bi-envelope-open me-2"></i><span id="viewMailSubject">Mail</span></h5>
+                <div id="viewMailReadActions" class="d-flex gap-2 flex-shrink-0">
+                    <button type="button" class="btn btn-sm btn-primary" id="viewMailReplyBtn" title="Besvar" aria-label="Besvar">
+                        <i class="bi bi-reply me-1"></i> Besvar
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" id="viewMailDeleteBtn" title="Slet" aria-label="Slet">
+                        <i class="bi bi-trash me-1"></i> Slet
+                    </button>
+                </div>
+                <div id="viewMailReplyActions" class="d-flex gap-2 flex-shrink-0 d-none">
+                    <button type="button" class="btn btn-sm btn-secondary" id="viewMailReplyCancelBtn">
+                        <i class="bi bi-x-lg me-1"></i> Annuller
+                    </button>
+                    <button type="submit" form="viewMailReplyFormEl" class="btn btn-sm btn-primary">
+                        <i class="bi bi-send me-1"></i> Send
+                    </button>
+                </div>
+                <button type="button" class="btn-close flex-shrink-0" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body">
+                <div id="viewMailLoading" class="text-center text-muted py-5">
+                    <span class="spinner-border spinner-border-sm me-2"></span>Indlæser...
+                </div>
+                <div id="viewMailError" class="text-danger d-none"></div>
+
+                <div id="viewMailContent" class="d-none">
+                    <dl class="row small text-muted mb-3">
+                        <dt class="col-sm-2">Fra</dt>
+                        <dd class="col-sm-10" id="viewMailFrom"></dd>
+                        <dt class="col-sm-2">Til</dt>
+                        <dd class="col-sm-10" id="viewMailTo"></dd>
+                        <dt class="col-sm-2">Modtaget</dt>
+                        <dd class="col-sm-10" id="viewMailReceived"></dd>
+                    </dl>
+                    <div id="viewMailAttachments" class="mb-3"></div>
+                    <div id="viewMailBodyContainer" class="form-control" style="max-height: 65vh; overflow-y: auto; height: auto;">
+                        <pre id="viewMailTextBody" class="mb-0" style="white-space: pre-wrap; font-family: inherit; color: inherit;"></pre>
+                    </div>
+                </div>
+
+                <!-- Besvar: hele mailen bliver ét redigerbart felt (som i Outlook) – det
+                     nye svar skrives i toppen, og den oprindelige mail er citeret
+                     nedenunder, så den også kan redigeres/beskæres. -->
+                <form id="viewMailReplyFormEl" class="d-none" asp-action="SendMail" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-2">
+                        <label class="form-label small mb-1">Til</label>
+                        <input name="To" type="text" class="form-control form-control-sm" required />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small mb-1">Emne</label>
+                        <input name="Subject" type="text" class="form-control form-control-sm" maxlength="200" required />
+                    </div>
+                    <textarea name="Body" id="viewMailReplyBody" class="form-control" style="min-height: 48vh; font-family: inherit;" maxlength="10000" required></textarea>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Slet mail modal -->
+<div class="modal fade" id="deleteMailModal" tabindex="-1" aria-labelledby="deleteMailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteMailModalLabel"><i class="bi bi-trash me-2"></i>Slet mail</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body">
+                Er du sikker på, at du vil slette mailen "<strong id="deleteMailSubject"></strong>"? Denne handling kan ikke fortrydes.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i> Annuller
+                </button>
+                <form asp-action="DeleteMail" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="Uid" id="deleteMailUid" />
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash me-1"></i> Slet
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (() => {
+        const mailRoot = document.getElementById('mailTableRoot');
+        const statusContainer = document.getElementById('mailStatusCards');
+        const pane = mailRoot?.closest('.tab-pane');
+        const tabButton = document.getElementById('mail-tab');
+
+        const handleAjaxSubmit = (form, modalEl) => {
+            if (!form) return;
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.disabled = true;
+                const data = await window.FvForm.submit(form);
+                if (submitBtn) submitBtn.disabled = false;
+                if (data.success) {
+                    if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+                    form.reset();
+                    window.FvDataTable?.reload(mailRoot);
+                }
+            });
+        };
+
+        const sendMailModal = document.getElementById('sendMailModal');
+        handleAjaxSubmit(sendMailModal?.querySelector('form'), sendMailModal);
+        // Nulstilles hver gang popup'en åbnes, så et tidligere udkast (fx fra et
+        // annulleret "Send mail") ikke hænger ved.
+        sendMailModal?.addEventListener('show.bs.modal', () => {
+            sendMailModal.querySelector('form')?.reset();
+        });
+
+        const deleteMailModal = document.getElementById('deleteMailModal');
+        handleAjaxSubmit(deleteMailModal?.querySelector('form'), deleteMailModal);
+        deleteMailModal?.addEventListener('show.bs.modal', (event) => {
+            const btn = event.relatedTarget;
+            if (!btn) return;
+            document.getElementById('deleteMailUid').value = btn.dataset.uid;
+            document.getElementById('deleteMailSubject').textContent = btn.dataset.subject || '';
+        });
+
+        // Vis mail: henter fuldt indhold (krop + vedhæftninger) live fra IMAP,
+        // hver gang popup'en åbnes. Vises som ren tekst (samme stil som
+        // svar-feltet), så HTML-mails ikke kan køre kode eller medbringe
+        // farver der clasher med appens tema.
+        const viewMailModal = document.getElementById('viewMailModal');
+        const viewMailLoading = document.getElementById('viewMailLoading');
+        const viewMailContent = document.getElementById('viewMailContent');
+        const viewMailError = document.getElementById('viewMailError');
+        const viewMailTextBody = document.getElementById('viewMailTextBody');
+        const viewMailReadActions = document.getElementById('viewMailReadActions');
+        const viewMailReplyActions = document.getElementById('viewMailReplyActions');
+        const viewMailReplyFormEl = document.getElementById('viewMailReplyFormEl');
+        const viewMailReplyBody = document.getElementById('viewMailReplyBody');
+        const viewMailReplyCancelBtn = document.getElementById('viewMailReplyCancelBtn');
+        let currentMailMessage = null;
+
+        // Gør en HTML-mail til ren tekst, så den kan citeres i et textarea
+        // (linjeskift fra <br>/<p>/<div> bevares, selve tags fjernes).
+        const htmlToPlainText = (html) => {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = html;
+            tmp.querySelectorAll('br').forEach((br) => br.replaceWith('\n'));
+            tmp.querySelectorAll('p, div, tr, li').forEach((el) => el.insertAdjacentText('beforeend', '\n'));
+            return tmp.textContent.replace(/\n{3,}/g, '\n\n').trim();
+        };
+
+        // Bygger svarteksten i Outlook-stil: tomme linjer til det nye svar i
+        // toppen, derefter en skillelinje og den oprindelige mail citeret.
+        const buildReplyBody = (message) => {
+            const original = message.textBody || (message.htmlBody ? htmlToPlainText(message.htmlBody) : '');
+            const sentDate = new Date(message.receivedAtUtc).toLocaleString('da-DK');
+            const header = `-----Oprindelig meddelelse-----\nFra: ${message.from}\nSendt: ${sentDate}\nTil: ${(message.to || []).join(', ')}\nEmne: ${message.subject || ''}\n\n`;
+            return `\n\n${header}${original}`;
+        };
+
+        viewMailModal?.addEventListener('show.bs.modal', async (event) => {
+            const uid = event.relatedTarget?.dataset.uid;
+            if (!uid) return;
+
+            currentMailMessage = null;
+            document.getElementById('viewMailSubject').textContent = 'Mail';
+            viewMailReplyFormEl.classList.add('d-none');
+            viewMailReplyActions.classList.add('d-none');
+            viewMailReadActions.classList.remove('d-none');
+            viewMailContent.classList.add('d-none');
+            viewMailError.classList.add('d-none');
+            viewMailLoading.classList.remove('d-none');
+
+            try {
+                const res = await fetch(`@Url.Action("MailMessage")?uid=${encodeURIComponent(uid)}`, { headers: { 'X-Requested-With': 'fetch' } });
+                if (!res.ok) throw new Error('fetch failed');
+                const message = await res.json();
+                currentMailMessage = message;
+
+                document.getElementById('viewMailSubject').textContent = message.subject || '(Intet emne)';
+                document.getElementById('viewMailFrom').textContent = message.from;
+                document.getElementById('viewMailTo').textContent = (message.to || []).join(', ');
+                document.getElementById('viewMailReceived').textContent = new Date(message.receivedAtUtc).toLocaleString('da-DK');
+
+                const attachmentsEl = document.getElementById('viewMailAttachments');
+                attachmentsEl.innerHTML = '';
+                if (message.attachments && message.attachments.length > 0) {
+                    const list = document.createElement('div');
+                    list.className = 'd-flex flex-column gap-1';
+                    message.attachments.forEach((a) => {
+                        const link = document.createElement('a');
+                        link.className = 'text-decoration-none';
+                        link.href = `@Url.Action("DownloadMailAttachment")?uid=${encodeURIComponent(uid)}&fileName=${encodeURIComponent(a.fileName)}`;
+                        link.innerHTML = `<i class="bi bi-paperclip me-1"></i>${a.fileName} <span class="text-muted small">(${(a.sizeBytes / 1024).toFixed(1)} KB)</span>`;
+                        list.appendChild(link);
+                    });
+                    attachmentsEl.appendChild(list);
+                }
+
+                viewMailTextBody.textContent = message.textBody
+                    || (message.htmlBody ? htmlToPlainText(message.htmlBody) : '(Intet indhold)');
+
+                viewMailContent.classList.remove('d-none');
+            } catch {
+                viewMailError.textContent = 'Kunne ikke indlæse mailen.';
+                viewMailError.classList.remove('d-none');
+            } finally {
+                viewMailLoading.classList.add('d-none');
+            }
+        });
+
+        // Besvar gør hele mailen til ét redigerbart felt (som i Outlook): det nye
+        // svar skrives i toppen, og den oprindelige mail er citeret nedenunder.
+        handleAjaxSubmit(viewMailReplyFormEl, viewMailModal);
+
+        document.getElementById('viewMailReplyBtn')?.addEventListener('click', () => {
+            if (!currentMailMessage) return;
+
+            const toField = viewMailReplyFormEl.querySelector('input[name="To"]');
+            const subjectField = viewMailReplyFormEl.querySelector('input[name="Subject"]');
+
+            toField.value = currentMailMessage.from || '';
+            const subject = (currentMailMessage.subject || '').trim();
+            subjectField.value = `Re: ${subject}`;
+            viewMailReplyBody.value = buildReplyBody(currentMailMessage);
+            document.getElementById('viewMailSubject').textContent = subjectField.value;
+
+            viewMailContent.classList.add('d-none');
+            viewMailReadActions.classList.add('d-none');
+            viewMailReplyFormEl.classList.remove('d-none');
+            viewMailReplyActions.classList.remove('d-none');
+
+            viewMailReplyBody.focus();
+            viewMailReplyBody.setSelectionRange(0, 0);
+            viewMailReplyBody.scrollTop = 0;
+        });
+
+        viewMailReplyCancelBtn?.addEventListener('click', () => {
+            viewMailReplyFormEl.classList.add('d-none');
+            viewMailReplyActions.classList.add('d-none');
+            viewMailContent.classList.remove('d-none');
+            viewMailReadActions.classList.remove('d-none');
+            document.getElementById('viewMailSubject').textContent = currentMailMessage?.subject || '(Intet emne)';
+        });
+
+        document.getElementById('viewMailDeleteBtn')?.addEventListener('click', () => {
+            if (!currentMailMessage) return;
+
+            // Udfylder felterne direkte, da show.bs.modal-håndteringen på
+            // deleteMailModal forventer en relatedTarget med data-uid/data-subject,
+            // som ikke findes, når modalen åbnes programmatisk herfra.
+            document.getElementById('deleteMailUid').value = currentMailMessage.uid;
+            document.getElementById('deleteMailSubject').textContent = currentMailMessage.subject || '';
+
+            viewMailModal.addEventListener('hidden.bs.modal', () => {
+                bootstrap.Modal.getOrCreateInstance(deleteMailModal).show();
+            }, { once: true });
+
+            bootstrap.Modal.getInstance(viewMailModal)?.hide();
+        });
+
+        // Genindlæser kort + tabel hvert 5. sekund, mens Mail-fanen er aktiv.
+        // Intervallet lagres på den vedvarende tab-pane (ikke på dette script's
+        // closure), så et nyt fanebladsbesøg kan rydde det forrige op i stedet
+        // for at stable flere intervaller, der hver poller mailboksen.
+        // Opdateringen er stille: DOM'en rammes kun, hvis svaret reelt er
+        // anderledes end det, der allerede vises, så layoutet ikke "hopper".
+        const refresh = async () => {
+            if (statusContainer) {
+                try {
+                    const res = await fetch('@Url.Action("MailStatus")', { headers: { 'X-Requested-With': 'fetch' } });
+                    if (res.ok) {
+                        const html = await res.text();
+                        if (statusContainer.innerHTML !== html) {
+                            statusContainer.innerHTML = html;
+                        }
+                    }
+                } catch { /* prøv igen ved næste tick */ }
+            }
+            window.FvDataTable?.reload(mailRoot, { silent: true });
+        };
+
+        if (pane) {
+            if (pane._mailRefreshInterval) clearInterval(pane._mailRefreshInterval);
+            pane._mailRefreshInterval = setInterval(refresh, 5000);
+
+            tabButton?.addEventListener('hidden.bs.tab', () => {
+                clearInterval(pane._mailRefreshInterval);
+                pane._mailRefreshInterval = null;
+            }, { once: true });
+        }
+    })();
+</script>

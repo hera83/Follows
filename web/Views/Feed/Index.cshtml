@@ -1,0 +1,678 @@
+@model web.ViewModels.FeedIndexViewModel
+@using web.Constants
+
+<div>
+    <div class="page-header">
+        <h1><i class="bi bi-images me-2"></i>Feeds</h1>
+        <p>Del historier, billeder og videoer fra dit ophold &mdash; så kan dine venner og familie følg med hjemmefra.</p>
+    </div>
+
+    <div class="feed-page">
+        <div class="card feed-composer">
+            <form id="feedComposerForm"
+                  action="@Url.Action("Create", "Feed")" method="post" enctype="multipart/form-data"
+                  data-max-files="@FeedLimits.MaxFilesPerPost"
+                  data-max-image-bytes="@FeedLimits.MaxImageBytes"
+                  data-max-video-bytes="@FeedLimits.MaxVideoBytes">
+                @Html.AntiForgeryToken()
+                <div class="feed-composer-top">
+                    <div class="feed-avatar">
+                        @if (Model.CurrentUserHasAvatar)
+                        {
+                            <img src="@Url.Action("Avatar", "Profile")" alt="@Model.CurrentUserDisplayName" />
+                        }
+                        else
+                        {
+                            <i class="bi bi-person-circle"></i>
+                        }
+                    </div>
+                    <textarea name="Caption" id="feedComposerCaption" class="feed-composer-textarea" rows="2"
+                              maxlength="@FeedLimits.MaxCaptionLength"
+                              placeholder="Del en historie fra opholdet..."></textarea>
+                </div>
+
+                <div id="feedComposerPreview" class="feed-composer-preview"></div>
+
+                <input type="file" id="feedComposerFileInput" name="Files" class="d-none" multiple
+                       accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" />
+
+                <div class="feed-composer-toolbar">
+                    <button type="button" class="btn btn-secondary" id="feedComposerAttachBtn">
+                        <i class="bi bi-images me-1"></i> Billede/video
+                    </button>
+                    <button type="submit" class="btn btn-primary ms-auto" id="feedComposerSubmitBtn" disabled>
+                        <i class="bi bi-send me-1"></i> Del historie
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        @if (Model.Posts.Count == 0)
+        {
+            <div class="feed-empty" id="feedEmptyState">
+                <i class="bi bi-images"></i>
+                <h2>Ingen opslag endnu</h2>
+                <p>Vær den første til at dele et billede, en video eller en historie fra opholdet.</p>
+            </div>
+        }
+
+        <div id="feedTranslatingBanner" class="feed-translating-banner" role="status" aria-live="polite"
+             data-format="@Model.TranslatingBannerFormat" data-label="@Model.TranslatingLabel">
+            <span class="spinner-border spinner-border-sm"></span>
+            <span id="feedTranslatingText"></span>
+        </div>
+
+        <div id="feedList" class="feed-list">
+            @await Html.PartialAsync("_FeedPostList", Model)
+        </div>
+    </div>
+</div>
+
+<!-- Bekræft sletning -->
+<div class="modal fade" id="feedConfirmDeleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5"><i class="bi bi-exclamation-triangle text-danger me-2"></i>Bekræft sletning</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body">
+                <p id="feedConfirmDeleteText" class="mb-0">Er du sikker?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Annuller</button>
+                <button type="button" class="btn btn-danger" id="feedConfirmDeleteBtn"><i class="bi bi-trash me-1"></i>Slet</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lightbox -->
+<div class="feed-lightbox" id="feedLightbox" aria-hidden="true">
+    <button type="button" class="feed-lightbox-close" id="feedLightboxClose" aria-label="Luk"><i class="bi bi-x-lg"></i></button>
+    <button type="button" class="feed-lightbox-nav feed-lightbox-prev" id="feedLightboxPrev" aria-label="Forrige"><i class="bi bi-chevron-left"></i></button>
+    <div class="feed-lightbox-content" id="feedLightboxContent"></div>
+    <button type="button" class="feed-lightbox-nav feed-lightbox-next" id="feedLightboxNext" aria-label="Næste"><i class="bi bi-chevron-right"></i></button>
+</div>
+
+@section Scripts {
+    <script>
+        (() => {
+            const feedList = document.getElementById('feedList');
+            const form = document.getElementById('feedComposerForm');
+            if (!feedList || !form) return;
+
+            const csrfToken = form.querySelector('input[name="__RequestVerificationToken"]').value;
+            const maxFiles = parseInt(form.dataset.maxFiles, 10) || 10;
+            const maxImageBytes = parseInt(form.dataset.maxImageBytes, 10);
+            const maxVideoBytes = parseInt(form.dataset.maxVideoBytes, 10);
+
+            // ─── Relative timestamps ────────────────────────────────────────────
+            const formatRelative = (iso) => {
+                const date = new Date(iso);
+                const diffMin = Math.floor((Date.now() - date.getTime()) / 60000);
+                if (diffMin < 1) return 'Lige nu';
+                if (diffMin < 60) return `for ${diffMin} min. siden`;
+                const diffH = Math.floor(diffMin / 60);
+                if (diffH < 24) return `for ${diffH} t. siden`;
+                const diffD = Math.floor(diffH / 24);
+                if (diffD < 7) return `for ${diffD} dag${diffD > 1 ? 'e' : ''} siden`;
+                return date.toLocaleDateString('da-DK', { day: 'numeric', month: 'short', year: 'numeric' }) +
+                    ' kl. ' + date.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
+            };
+
+            const formatTimes = (scope) => {
+                (scope || document).querySelectorAll('.feed-time[data-utc]').forEach((el) => {
+                    el.textContent = formatRelative(el.dataset.utc);
+                    el.title = new Date(el.dataset.utc).toLocaleString('da-DK');
+                });
+            };
+
+            // ─── Small entrance animation for freshly-inserted elements ────────
+            const animateIn = (el) => {
+                if (!el) return;
+                el.classList.add('feed-fade-in');
+                el.addEventListener('animationend', () => el.classList.remove('feed-fade-in'), { once: true });
+            };
+
+            // ─── Composer: textarea autosize + attachments ──────────────────────
+            const captionEl = document.getElementById('feedComposerCaption');
+            const submitBtn = document.getElementById('feedComposerSubmitBtn');
+            const fileInput = document.getElementById('feedComposerFileInput');
+            const previewEl = document.getElementById('feedComposerPreview');
+            let selectedFiles = [];
+
+            const autoSize = (el) => {
+                el.style.height = 'auto';
+                el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+            };
+
+            const updateSubmitState = () => {
+                submitBtn.disabled = !(captionEl.value.trim().length > 0 || selectedFiles.length > 0);
+            };
+
+            const syncFileInput = () => {
+                const dt = new DataTransfer();
+                selectedFiles.forEach((f) => dt.items.add(f));
+                fileInput.files = dt.files;
+            };
+
+            const renderPreviews = () => {
+                previewEl.innerHTML = '';
+                selectedFiles.forEach((file, idx) => {
+                    const chip = document.createElement('div');
+                    chip.className = 'feed-preview-chip';
+
+                    if (file.type.startsWith('video/')) {
+                        chip.innerHTML = '<div class="feed-preview-video"><i class="bi bi-camera-video-fill"></i></div>';
+                    } else {
+                        const img = document.createElement('img');
+                        img.src = URL.createObjectURL(file);
+                        chip.appendChild(img);
+                    }
+
+                    const removeBtn = document.createElement('button');
+                    removeBtn.type = 'button';
+                    removeBtn.className = 'feed-preview-remove';
+                    removeBtn.setAttribute('aria-label', 'Fjern');
+                    removeBtn.innerHTML = '<i class="bi bi-x"></i>';
+                    removeBtn.addEventListener('click', () => {
+                        selectedFiles.splice(idx, 1);
+                        syncFileInput();
+                        renderPreviews();
+                        updateSubmitState();
+                    });
+                    chip.appendChild(removeBtn);
+                    previewEl.appendChild(chip);
+                });
+            };
+
+            document.getElementById('feedComposerAttachBtn').addEventListener('click', () => fileInput.click());
+
+            captionEl.addEventListener('input', () => { autoSize(captionEl); updateSubmitState(); });
+
+            fileInput.addEventListener('change', () => {
+                const incoming = Array.from(fileInput.files || []);
+                for (const file of incoming) {
+                    if (selectedFiles.length >= maxFiles) {
+                        window.FvToast.show('warning', `Du kan højst vedhæfte ${maxFiles} filer.`);
+                        break;
+                    }
+                    const isVideo = file.type.startsWith('video/');
+                    const maxBytes = isVideo ? maxVideoBytes : maxImageBytes;
+                    if (file.size > maxBytes) {
+                        window.FvToast.show('warning', `'${file.name}' er for stor.`);
+                        continue;
+                    }
+                    selectedFiles.push(file);
+                }
+                syncFileInput();
+                renderPreviews();
+                updateSubmitState();
+            });
+
+            // ─── Shared, deduped fetch of one post's card HTML ──────────────────
+            // Feed/Post/{id} does the slow, live translation for anything not cached yet. Several
+            // things can want the same post refreshed close together (the initial background scan,
+            // posting a comment on it, another "Indlæs flere" scan) — without dedup, each would fire
+            // its own independent live-translate request, and on a modest self-hosted AI backend that
+            // serves one request at a time, those pile up behind each other and never seem to finish.
+            // Callers for the same postId share one in-flight request instead.
+            const inFlightPostFetches = new Map();
+
+            const fetchPostCardHtml = (postId) => {
+                if (inFlightPostFetches.has(postId)) return inFlightPostFetches.get(postId);
+
+                const promise = fetch(`/Feed/Post/${postId}`, { headers: { 'X-Requested-With': 'fetch' } })
+                    .then((res) => (res.ok ? res.text() : null))
+                    .catch(() => null)
+                    .finally(() => inFlightPostFetches.delete(postId));
+
+                inFlightPostFetches.set(postId, promise);
+                return promise;
+            };
+
+            const prependPost = async (postId) => {
+                // PostFast: a post you just created is, by definition, already in your own language —
+                // no reason to make you wait on a live translate/verify pass just to see it appear.
+                const res = await fetch(`/Feed/PostFast/${postId}`, { headers: { 'X-Requested-With': 'fetch' } });
+                if (!res.ok) return;
+                const html = await res.text();
+                document.getElementById('feedEmptyState')?.remove();
+                feedList.insertAdjacentHTML('afterbegin', html);
+                const el = feedList.firstElementChild;
+                formatTimes(el);
+                animateIn(el);
+            };
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (submitBtn.disabled) return;
+
+                submitBtn.disabled = true;
+                const originalHtml = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Deler...';
+
+                const data = await window.FvForm.submit(form);
+
+                submitBtn.innerHTML = originalHtml;
+
+                if (data.success && data.postId) {
+                    captionEl.value = '';
+                    autoSize(captionEl);
+                    selectedFiles = [];
+                    syncFileInput();
+                    renderPreviews();
+                    await prependPost(data.postId);
+                    // Catches any other post on the page still waiting on a translation — a new
+                    // post/comment is a good moment to nudge those along too, per the same sync
+                    // the initial page load already kicks off.
+                    scanForPendingTranslations(feedList);
+                }
+                updateSubmitState();
+            });
+
+            // ─── Single-post refresh helper (translation-sync only — see appendComment/deleteComment
+            // below for why adding/removing a comment no longer routes through here) ──────────────
+            const refreshPost = async (postId) => {
+                const html = await fetchPostCardHtml(postId);
+                if (!html) return false;
+                const old = feedList.querySelector(`.feed-post[data-post-id="${postId}"]`);
+                if (old) {
+                    old.outerHTML = html;
+                    const fresh = feedList.querySelector(`.feed-post[data-post-id="${postId}"]`);
+                    formatTimes(fresh);
+                    animateIn(fresh);
+                }
+                return true;
+            };
+
+            // ─── Instantly show a just-posted comment ───────────────────────────
+            // A comment is always in its own author's language, so it never needs translating for
+            // them — no reason to route it through the slow live-translate path (refreshPost/
+            // Feed/Post/{id}) just to make it appear. CommentItem renders it as-is, no AI call, so
+            // this is effectively instant.
+            const appendComment = async (postId, commentId) => {
+                try {
+                    const res = await fetch(`/Feed/CommentItem/${commentId}`, { headers: { 'X-Requested-With': 'fetch' } });
+                    if (!res.ok) return;
+                    const html = await res.text();
+
+                    const article = feedList.querySelector(`.feed-post[data-post-id="${postId}"]`);
+                    if (!article) return;
+
+                    const list = article.querySelector('.feed-comments');
+                    list.insertAdjacentHTML('beforeend', html);
+                    const newEl = list.lastElementChild;
+                    formatTimes(newEl);
+                    animateIn(newEl);
+
+                    const countEl = article.querySelector('.feed-comment-count');
+                    if (countEl) {
+                        const n = (parseInt(countEl.dataset.count, 10) || 0) + 1;
+                        countEl.dataset.count = n;
+                        countEl.querySelector('.feed-comment-count-num').textContent = n;
+                    }
+
+                    // A brand-new comment hasn't been through language verification yet — flag the
+                    // post so the sync we trigger right after this picks it up (for anyone else who
+                    // might need it translated; the author who just wrote it never will).
+                    article.dataset.needsTranslation = 'true';
+                } catch { /* ignorer */ }
+            };
+
+            // ─── Background translation pass ────────────────────────────────────
+            // The feed always renders instantly with cached translations (or original text) — posts
+            // still needing a live translation are flagged data-needs-translation="true" server-side.
+            // We pick those up here, translate them one request per post in the background (each
+            // request also translates that post's comments), and show a small "Oversætter..." banner
+            // while any are in flight so a slow translation never looks like a frozen page.
+            const translatingBanner = document.getElementById('feedTranslatingBanner');
+            const translatingText = document.getElementById('feedTranslatingText');
+            const translatingFormat = translatingBanner.dataset.format || 'Oversætter {0} opslag...';
+            const translatingLabel = translatingBanner.dataset.label || 'Oversætter...';
+            let pendingTranslations = 0;
+
+            const updateTranslatingBanner = () => {
+                if (pendingTranslations > 0) {
+                    translatingText.textContent = translatingFormat.replace('{0}', pendingTranslations);
+                    translatingBanner.classList.add('is-visible');
+                } else {
+                    translatingBanner.classList.remove('is-visible');
+                }
+            };
+
+            // Shows the same "Oversætter..." badge a post gets server-rendered with when it arrives
+            // already needing translation. Posts picked up here often don't have it yet — e.g. a
+            // comment just appended by appendComment() — since the last HTML the server sent for that
+            // post predates the new comment. refreshPost() below replaces the whole article with a
+            // fresh server render once the translation lands, which removes this again on its own.
+            const showPostTranslatingBadge = (article) => {
+                if (article.querySelector('.feed-translating-badge')) return;
+                const badge = document.createElement('span');
+                badge.className = 'feed-translating-badge';
+                badge.innerHTML = `<span class="spinner-border spinner-border-sm"></span> ${translatingLabel}`;
+                const header = article.querySelector('.feed-post-header');
+                (header || article).insertAdjacentElement('afterend', badge);
+            };
+
+            const scanForPendingTranslations = (scope) => {
+                const pending = Array.from((scope || feedList).querySelectorAll('.feed-post[data-needs-translation="true"]'));
+                if (!pending.length) return;
+
+                // Mark as in-progress immediately so a second scan (e.g. right after Indlæs flere)
+                // can't pick the same post up twice while its first request is still in flight.
+                pending.forEach((article) => {
+                    article.dataset.needsTranslation = 'in-progress';
+                    showPostTranslatingBadge(article);
+                });
+
+                pendingTranslations += pending.length;
+                updateTranslatingBanner();
+
+                pending.forEach(async (article) => {
+                    const postId = article.dataset.postId;
+                    const ok = await refreshPost(postId);
+                    if (!ok) {
+                        // Fetch/translate failed (network hiccup, AI Gateway timeout, ...) — put it
+                        // back to "true" so the next scan (a reload, or the next comment/post) retries
+                        // it instead of it being stuck forever.
+                        const stillThere = feedList.querySelector(`.feed-post[data-post-id="${postId}"]`);
+                        if (stillThere) stillThere.dataset.needsTranslation = 'true';
+                    }
+                    pendingTranslations = Math.max(0, pendingTranslations - 1);
+                    updateTranslatingBanner();
+                });
+            };
+
+            // ─── Like toggle ─────────────────────────────────────────────────────
+            const toggleLike = async (btn) => {
+                if (btn.disabled) return;
+                btn.disabled = true;
+                try {
+                    const fd = new FormData();
+                    fd.set('postId', btn.dataset.postId);
+                    fd.set('__RequestVerificationToken', csrfToken);
+                    const res = await fetch('/Feed/ToggleLike', { method: 'POST', body: fd, headers: { 'X-Requested-With': 'fetch' } });
+                    const data = await res.json();
+                    if (data.success) {
+                        btn.classList.toggle('is-liked', data.liked);
+                        btn.setAttribute('aria-pressed', String(data.liked));
+                        btn.querySelector('i').className = `bi ${data.liked ? 'bi-heart-fill' : 'bi-heart'}`;
+                        btn.querySelector('.feed-like-count').textContent = data.likeCount;
+                        // The liker list just changed — drop any cached names for this post so the
+                        // hover popup re-fetches instead of showing a stale list next time.
+                        likersCache.delete(btn.dataset.postId);
+                    }
+                } catch {
+                    window.FvToast.show('error', 'Netværksfejl. Prøv igen.');
+                } finally {
+                    btn.disabled = false;
+                }
+            };
+
+            // ─── Like button hover popup: who liked this post ───────────────────
+            // A discreet, title-tooltip-like popup listing likers' names, shown after the mouse has
+            // rested on the heart for a beat (not immediately, like a native title tooltip). Names are
+            // fetched on demand and cached per post so hovering the same post again is instant; the
+            // cache is invalidated above whenever the current user's own like state changes.
+            const likersCache = new Map(); // postId -> { names, total }
+            const likersTooltip = document.createElement('div');
+            likersTooltip.className = 'feed-likers-tooltip';
+            likersTooltip.setAttribute('role', 'tooltip');
+            document.body.appendChild(likersTooltip);
+
+            let likerHoverTimer = null;
+            let likerHoverBtn = null;
+
+            const hideLikersTooltip = () => {
+                likersTooltip.classList.remove('is-visible');
+                likerHoverBtn = null;
+            };
+
+            const positionLikersTooltip = (btn) => {
+                const rect = btn.getBoundingClientRect();
+                const tipRect = likersTooltip.getBoundingClientRect();
+                let left = rect.left + rect.width / 2 - tipRect.width / 2;
+                left = Math.max(8, Math.min(left, window.innerWidth - tipRect.width - 8));
+                let top = rect.top - tipRect.height - 8;
+                let flipped = false;
+                if (top < 8) { top = rect.bottom + 8; flipped = true; }
+                likersTooltip.style.left = `${left}px`;
+                likersTooltip.style.top = `${top}px`;
+                likersTooltip.classList.toggle('is-flipped', flipped);
+                likersTooltip.style.setProperty('--arrow-left', `${rect.left + rect.width / 2 - left}px`);
+            };
+
+            const renderLikersTooltip = (btn, data) => {
+                if (likerHoverBtn !== btn) return; // moved on before the fetch finished
+                if (!data || !data.names || data.names.length === 0) { hideLikersTooltip(); return; }
+
+                const extra = data.total - data.names.length;
+                const lines = extra > 0 ? [...data.names, `og ${extra} andre`] : data.names;
+                likersTooltip.textContent = lines.join('\n');
+                likersTooltip.classList.add('is-visible');
+                positionLikersTooltip(btn);
+            };
+
+            const showLikersTooltip = async (btn) => {
+                const postId = btn.dataset.postId;
+                const likeCount = parseInt(btn.querySelector('.feed-like-count')?.textContent, 10) || 0;
+                if (likeCount === 0) return;
+
+                const cached = likersCache.get(postId);
+                if (cached) { renderLikersTooltip(btn, cached); return; }
+
+                try {
+                    const res = await fetch(`/Feed/Likers/${postId}`, { headers: { 'X-Requested-With': 'fetch' } });
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    if (!data.success) return;
+                    likersCache.set(postId, data);
+                    renderLikersTooltip(btn, data);
+                } catch { /* diskret popup — ingen fejlbesked ved netværksfejl */ }
+            };
+
+            feedList.addEventListener('mouseover', (e) => {
+                const btn = e.target.closest('.feed-like-btn');
+                if (!btn || btn.contains(e.relatedTarget)) return;
+                likerHoverBtn = btn;
+                clearTimeout(likerHoverTimer);
+                likerHoverTimer = setTimeout(() => showLikersTooltip(btn), 1000);
+            });
+
+            feedList.addEventListener('mouseout', (e) => {
+                const btn = e.target.closest('.feed-like-btn');
+                if (!btn || btn.contains(e.relatedTarget)) return;
+                clearTimeout(likerHoverTimer);
+                hideLikersTooltip();
+            });
+
+            window.addEventListener('scroll', hideLikersTooltip, true);
+            window.addEventListener('resize', hideLikersTooltip);
+
+            // ─── Load more ───────────────────────────────────────────────────────
+            const loadMore = async (btn) => {
+                const beforeId = btn.dataset.beforeId;
+                const wrap = btn.closest('.feed-load-more-wrap');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Indlæser...';
+                try {
+                    const res = await fetch(`/Feed/LoadMore?beforeId=${encodeURIComponent(beforeId)}`, { headers: { 'X-Requested-With': 'fetch' } });
+                    if (!res.ok) return;
+                    const html = await res.text();
+                    wrap?.remove();
+                    const temp = document.createElement('div');
+                    temp.innerHTML = html;
+                    Array.from(temp.children).forEach((node) => feedList.appendChild(node));
+                    formatTimes(feedList);
+                    scanForPendingTranslations(feedList);
+                } catch {
+                    window.FvToast.show('error', 'Netværksfejl. Prøv igen.');
+                }
+            };
+
+            // ─── Lightbox ────────────────────────────────────────────────────────
+            const lightbox = document.getElementById('feedLightbox');
+            const lightboxContent = document.getElementById('feedLightboxContent');
+            const lightboxPrev = document.getElementById('feedLightboxPrev');
+            const lightboxNext = document.getElementById('feedLightboxNext');
+            let lightboxItems = [];
+            let lightboxIndex = 0;
+
+            const renderLightbox = () => {
+                const tile = lightboxItems[lightboxIndex];
+                if (!tile) return;
+                const mediaId = tile.dataset.mediaId;
+                lightboxContent.innerHTML = tile.classList.contains('feed-media-video')
+                    ? `<video src="/Feed/Media/${mediaId}" controls autoplay class="feed-lightbox-media"></video>`
+                    : `<img src="/Feed/Media/${mediaId}" class="feed-lightbox-media" alt="Billede" />`;
+                const showNav = lightboxItems.length > 1;
+                lightboxPrev.style.visibility = showNav ? 'visible' : 'hidden';
+                lightboxNext.style.visibility = showNav ? 'visible' : 'hidden';
+            };
+
+            const openLightbox = (tileBtn) => {
+                const grid = tileBtn.closest('.feed-media-grid');
+                lightboxItems = Array.from(grid.querySelectorAll('.feed-media-item'));
+                lightboxIndex = lightboxItems.indexOf(tileBtn);
+                renderLightbox();
+                lightbox.classList.add('is-open');
+                lightbox.setAttribute('aria-hidden', 'false');
+            };
+
+            const closeLightbox = () => {
+                lightbox.classList.remove('is-open');
+                lightbox.setAttribute('aria-hidden', 'true');
+                lightboxContent.innerHTML = '';
+            };
+
+            document.getElementById('feedLightboxClose').addEventListener('click', closeLightbox);
+            lightboxPrev.addEventListener('click', () => {
+                lightboxIndex = (lightboxIndex - 1 + lightboxItems.length) % lightboxItems.length;
+                renderLightbox();
+            });
+            lightboxNext.addEventListener('click', () => {
+                lightboxIndex = (lightboxIndex + 1) % lightboxItems.length;
+                renderLightbox();
+            });
+            lightbox.addEventListener('click', (e) => { if (e.target === lightbox) closeLightbox(); });
+            document.addEventListener('keydown', (e) => {
+                if (!lightbox.classList.contains('is-open')) return;
+                if (e.key === 'Escape') closeLightbox();
+                if (e.key === 'ArrowLeft') lightboxPrev.click();
+                if (e.key === 'ArrowRight') lightboxNext.click();
+            });
+
+            // ─── Confirm-delete modal (shared for posts & comments) ────────────
+            const confirmModalEl = document.getElementById('feedConfirmDeleteModal');
+            const bsConfirmModal = new bootstrap.Modal(confirmModalEl);
+            const confirmText = document.getElementById('feedConfirmDeleteText');
+            const confirmBtn = document.getElementById('feedConfirmDeleteBtn');
+            let pendingDelete = null;
+
+            const confirmDelete = (type, id) => {
+                pendingDelete = { type, id };
+                confirmText.textContent = type === 'post'
+                    ? 'Er du sikker på, at du vil slette dette opslag? Billeder, videoer og kommentarer forsvinder også.'
+                    : 'Er du sikker på, at du vil slette denne kommentar?';
+                bsConfirmModal.show();
+            };
+
+            confirmBtn.addEventListener('click', async () => {
+                if (!pendingDelete) return;
+                confirmBtn.disabled = true;
+                try {
+                    const fd = new FormData();
+                    fd.set('__RequestVerificationToken', csrfToken);
+
+                    if (pendingDelete.type === 'post') {
+                        fd.set('postId', pendingDelete.id);
+                        const res = await fetch('/Feed/DeletePost', { method: 'POST', body: fd, headers: { 'X-Requested-With': 'fetch' } });
+                        const data = await res.json();
+                        window.FvToast.show(data.type || (data.success ? 'success' : 'error'), data.message);
+                        if (data.success) {
+                            feedList.querySelector(`.feed-post[data-post-id="${pendingDelete.id}"]`)?.remove();
+                            if (!feedList.querySelector('.feed-post')) location.reload();
+                        }
+                    } else {
+                        fd.set('commentId', pendingDelete.id);
+                        const res = await fetch('/Feed/DeleteComment', { method: 'POST', body: fd, headers: { 'X-Requested-With': 'fetch' } });
+                        const data = await res.json();
+                        window.FvToast.show(data.type || (data.success ? 'success' : 'error'), data.message);
+                        if (data.success) {
+                            // Removing a comment doesn't need a live-translate round trip either —
+                            // just take it out and update the count directly.
+                            feedList.querySelector(`.feed-comment[data-comment-id="${pendingDelete.id}"]`)?.remove();
+                            if (data.postId) {
+                                const article = feedList.querySelector(`.feed-post[data-post-id="${data.postId}"]`);
+                                const countEl = article?.querySelector('.feed-comment-count');
+                                if (countEl) {
+                                    const n = Math.max(0, (parseInt(countEl.dataset.count, 10) || 0) - 1);
+                                    countEl.dataset.count = n;
+                                    countEl.querySelector('.feed-comment-count-num').textContent = n;
+                                }
+                            }
+                        }
+                    }
+                } catch {
+                    window.FvToast.show('error', 'Netværksfejl. Prøv igen.');
+                } finally {
+                    confirmBtn.disabled = false;
+                    bsConfirmModal.hide();
+                    pendingDelete = null;
+                }
+            });
+
+            // ─── Delegated events on the feed list (survives dynamic updates) ──
+            feedList.addEventListener('click', (e) => {
+                const mediaBtn = e.target.closest('.feed-media-item');
+                if (mediaBtn) { openLightbox(mediaBtn); return; }
+
+                const likeBtn = e.target.closest('.feed-like-btn');
+                if (likeBtn) { toggleLike(likeBtn); return; }
+
+                const deletePostBtn = e.target.closest('.feed-delete-post');
+                if (deletePostBtn) { confirmDelete('post', deletePostBtn.dataset.postId); return; }
+
+                const deleteCommentBtn = e.target.closest('.feed-delete-comment');
+                if (deleteCommentBtn) { confirmDelete('comment', deleteCommentBtn.dataset.commentId); return; }
+
+                const loadMoreBtn = e.target.closest('.feed-load-more');
+                if (loadMoreBtn) { loadMore(loadMoreBtn); }
+            });
+
+            feedList.addEventListener('submit', async (e) => {
+                const commentForm = e.target.closest('.feed-comment-form');
+                if (!commentForm) return;
+                e.preventDefault();
+
+                const input = commentForm.querySelector('.feed-comment-input');
+                if (!input.value.trim()) return;
+
+                const sendBtn = commentForm.querySelector('.feed-comment-send');
+                const originalSendHtml = sendBtn.innerHTML;
+                sendBtn.disabled = true;
+                sendBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+                try {
+                    const data = await window.FvForm.submit(commentForm);
+
+                    if (data.success && data.postId && data.commentId) {
+                        input.value = '';
+                        await appendComment(data.postId, data.commentId);
+                        // Same reasoning as after posting a story: use the moment to nudge along any
+                        // other post on the page still waiting on its translation.
+                        scanForPendingTranslations(feedList);
+                    }
+                } finally {
+                    sendBtn.disabled = false;
+                    sendBtn.innerHTML = originalSendHtml;
+                }
+            });
+
+            formatTimes(feedList);
+            scanForPendingTranslations(feedList);
+        })();
+    </script>
+}

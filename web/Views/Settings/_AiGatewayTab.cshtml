@@ -1,0 +1,257 @@
+@model web.ViewModels.AiGatewaySettingsViewModel
+
+<div data-table-root id="aiGatewayTabRoot" data-table-endpoint="@Url.Action("AiGatewayTable")">
+    <div class="table-toolbar mb-3">
+        <div class="table-toolbar-end">
+            <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#aiGatewayChatModal" title="Chat" aria-label="Chat">
+                <i class="bi bi-chat-dots"></i> Chat
+            </button>
+            <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#aiGatewayRagChatModal" title="RAG Chat" aria-label="RAG Chat">
+                <i class="bi bi-chat-square-dots"></i> RAG Chat
+            </button>
+            <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#createAiGatewayGroupModal" title="Ny gruppe" aria-label="Ny gruppe">
+                <i class="bi bi-folder-plus"></i> Ny gruppe
+            </button>
+        </div>
+    </div>
+
+    <div data-table-region>
+        @await Html.PartialAsync("_AiGatewayTabBody", Model)
+    </div>
+</div>
+
+<!-- Chat modal -->
+<div class="modal fade" id="aiGatewayChatModal" tabindex="-1" aria-labelledby="aiGatewayChatModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="aiGatewayChatModalLabel"><i class="bi bi-chat-dots me-2"></i>Chat</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body p-0">
+                @await Html.PartialAsync("~/Views/Shared/Partials/_Chat.cshtml", new web.ViewModels.ChatWidgetViewModel
+                {
+                    Title = "AiGateway chat",
+                    Model = Model.DefaultChatModel,
+                    Action = "StreamMessageAiGateway",
+                    Controller = "Chat",
+                    EnableTts = true,
+                    EnableStt = true
+                })
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ny chat (RAG) modal -->
+<div class="modal fade" id="aiGatewayRagChatModal" tabindex="-1" aria-labelledby="aiGatewayRagChatModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="aiGatewayRagChatModalLabel"><i class="bi bi-chat-square-dots me-2"></i>RAG Chat</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body p-0">
+                @await Html.PartialAsync("~/Views/Shared/Partials/_Chat.cshtml", new web.ViewModels.ChatWidgetViewModel
+                {
+                    Title = "AiGateway RAG-chat",
+                    Model = Model.DefaultChatModel,
+                    Action = "StreamMessageAiGatewayRag",
+                    Controller = "Chat",
+                    EnableTts = true,
+                    EnableStt = true
+                })
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ny gruppe modal -->
+<div class="modal fade" id="createAiGatewayGroupModal" tabindex="-1" aria-labelledby="createAiGatewayGroupModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form asp-action="CreateAiGatewayGroup" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createAiGatewayGroupModalLabel"><i class="bi bi-folder-plus me-2"></i>Ny gruppe</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label">Navn</label>
+                    <input name="Name" class="form-control" placeholder="f.eks. Personalehåndbog" required maxlength="200" />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i> Annuller
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-floppy me-1"></i> Opret
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Upload dokument modal -->
+<div class="modal fade" id="uploadAiGatewayDocumentModal" tabindex="-1" aria-labelledby="uploadAiGatewayDocumentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form asp-action="UploadAiGatewayDocument" method="post" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="GroupId" id="uploadAiGatewayGroupId" />
+                <div class="modal-header">
+                    <h5 class="modal-title" id="uploadAiGatewayDocumentModalLabel">
+                        <i class="bi bi-upload me-2"></i>Upload dokument til <span id="uploadAiGatewayGroupName"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label">Fil</label>
+                    <input type="file" name="File" class="form-control" required />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i> Annuller
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="spinner-border spinner-border-sm me-1 d-none" data-upload-spinner></span>
+                        <i class="bi bi-upload me-1" data-upload-icon></i> Upload
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Slet gruppe modal -->
+<div class="modal fade" id="deleteAiGatewayGroupModal" tabindex="-1" aria-labelledby="deleteAiGatewayGroupModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteAiGatewayGroupModalLabel"><i class="bi bi-trash me-2"></i>Slet gruppe</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body">
+                Er du sikker på, at du vil slette gruppen <strong id="deleteAiGatewayGroupName"></strong>? Alle tilhørende dokumenter slettes også. Denne handling kan ikke fortrydes.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i> Annuller
+                </button>
+                <form asp-action="DeleteAiGatewayGroup" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" id="deleteAiGatewayGroupInput" />
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash me-1"></i> Slet
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Slet dokument modal -->
+<div class="modal fade" id="deleteAiGatewayDocumentModal" tabindex="-1" aria-labelledby="deleteAiGatewayDocumentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteAiGatewayDocumentModalLabel"><i class="bi bi-trash me-2"></i>Slet dokument</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body">
+                Er du sikker på, at du vil slette dokumentet <strong id="deleteAiGatewayDocumentName"></strong>? Denne handling kan ikke fortrydes.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i> Annuller
+                </button>
+                <form asp-action="DeleteAiGatewayDocument" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" id="deleteAiGatewayDocumentInput" />
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash me-1"></i> Slet
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (() => {
+        const root = document.getElementById('aiGatewayTabRoot');
+
+        const aiGatewayChatModal = document.getElementById('aiGatewayChatModal');
+        aiGatewayChatModal?.addEventListener('show.bs.modal', (event) => {
+            const chatWidget = event.target.querySelector('.chat-widget');
+            if (chatWidget) window.FvChat?.reset(chatWidget);
+        });
+        aiGatewayChatModal?.addEventListener('hide.bs.modal', (event) => {
+            const chatWidget = event.target.querySelector('.chat-widget');
+            if (chatWidget) window.FvChat?.reset(chatWidget);
+        });
+
+        const aiGatewayRagChatModal = document.getElementById('aiGatewayRagChatModal');
+        aiGatewayRagChatModal?.addEventListener('show.bs.modal', (event) => {
+            const chatWidget = event.target.querySelector('.chat-widget');
+            if (chatWidget) window.FvChat?.reset(chatWidget);
+        });
+        aiGatewayRagChatModal?.addEventListener('hide.bs.modal', (event) => {
+            const chatWidget = event.target.querySelector('.chat-widget');
+            if (chatWidget) window.FvChat?.reset(chatWidget);
+        });
+
+        const handleAjaxSubmit = (form, modalEl) => {
+            if (!form) return;
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const submitBtn = form.querySelector('button[type="submit"]');
+                const spinner = form.querySelector('[data-upload-spinner]');
+                const icon = form.querySelector('[data-upload-icon]');
+                if (submitBtn) submitBtn.disabled = true;
+                spinner?.classList.remove('d-none');
+                icon?.classList.add('d-none');
+                const data = await window.FvForm.submit(form);
+                if (submitBtn) submitBtn.disabled = false;
+                spinner?.classList.add('d-none');
+                icon?.classList.remove('d-none');
+                if (data.success) {
+                    if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+                    form.reset();
+                    window.FvDataTable?.reload(root);
+                }
+            });
+        };
+
+        const createGroupModal = document.getElementById('createAiGatewayGroupModal');
+        handleAjaxSubmit(createGroupModal?.querySelector('form'), createGroupModal);
+
+        const uploadModal = document.getElementById('uploadAiGatewayDocumentModal');
+        handleAjaxSubmit(uploadModal?.querySelector('form'), uploadModal);
+        uploadModal?.addEventListener('show.bs.modal', (event) => {
+            const btn = event.relatedTarget;
+            if (!btn) return;
+            document.getElementById('uploadAiGatewayGroupId').value = btn.dataset.groupId;
+            document.getElementById('uploadAiGatewayGroupName').textContent = btn.dataset.groupName;
+        });
+
+        const deleteGroupModal = document.getElementById('deleteAiGatewayGroupModal');
+        handleAjaxSubmit(deleteGroupModal?.querySelector('form'), deleteGroupModal);
+        deleteGroupModal?.addEventListener('show.bs.modal', (event) => {
+            const btn = event.relatedTarget;
+            if (!btn) return;
+            document.getElementById('deleteAiGatewayGroupInput').value = btn.dataset.id;
+            document.getElementById('deleteAiGatewayGroupName').textContent = btn.dataset.name;
+        });
+
+        const deleteDocumentModal = document.getElementById('deleteAiGatewayDocumentModal');
+        handleAjaxSubmit(deleteDocumentModal?.querySelector('form'), deleteDocumentModal);
+        deleteDocumentModal?.addEventListener('show.bs.modal', (event) => {
+            const btn = event.relatedTarget;
+            if (!btn) return;
+            document.getElementById('deleteAiGatewayDocumentInput').value = btn.dataset.id;
+            document.getElementById('deleteAiGatewayDocumentName').textContent = btn.dataset.name;
+        });
+    })();
+</script>

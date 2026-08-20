@@ -1,0 +1,67 @@
+@model web.ViewModels.LogFilterViewModel
+
+<div class="table-responsive">
+    <table class="table table-sm table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Tidspunkt UTC</th>
+                <th>Level</th>
+                <th>Message</th>
+                <th>Exception</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Entries.Any())
+            {
+                @foreach (var log in Model.Entries)
+                {
+                    <tr>
+                        <td>@log.TimestampUtc.ToString("u")</td>
+                        <td>
+                            <span class="@(log.Level switch
+                            {
+                                "Fatal" or "Error" => "badge-alarm",
+                                "Warning" => "badge-warn",
+                                _ => "badge-info"
+                            })">@log.Level</span>
+                        </td>
+                        <td>@log.Message</td>
+                        <td class="text-danger">@log.Exception</td>
+                    </tr>
+                }
+            }
+            else
+            {
+                <tr>
+                    <td colspan="4" class="text-muted">Ingen logs fundet.</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="table-footer">
+    <p class="table-footer-count">
+        @if (Model.TotalCount == 0)
+        {
+            <text>Ingen resultater</text>
+        }
+        else
+        {
+            <text>Viser @(((Model.Page - 1) * Model.PageSize) + 1)-@(Math.Min(Model.Page * Model.PageSize, Model.TotalCount)) af @Model.TotalCount</text>
+        }
+    </p>
+    <div class="table-footer-end">
+        <span class="table-pagesize-label">Pr. side</span>
+        <select class="table-pagesize" data-table-page-size aria-label="Pr. side">
+            <option value="10" selected="@(Model.PageSize == 10)">10</option>
+            <option value="50" selected="@(Model.PageSize == 50)">50</option>
+            <option value="100" selected="@(Model.PageSize == 100)">100</option>
+        </select>
+        @await Html.PartialAsync("~/Views/Shared/Partials/_Pagination.cshtml", new web.ViewModels.PaginationViewModel
+        {
+            Page = Model.Page,
+            TotalPages = (int)Math.Ceiling(Model.TotalCount / (double)Model.PageSize)
+        })
+    </div>
+</div>

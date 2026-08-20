@@ -1,0 +1,52 @@
+@model web.ViewModels.LogFilterViewModel
+
+<div data-table-root data-table-endpoint="@Url.Action("LogsTable")">
+    <div class="table-toolbar mb-3">
+        <div class="table-toolbar-start">
+            <button class="btn btn-icon btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#logsFilterPanel" title="Filtre" aria-label="Filtre">
+                <i class="bi bi-funnel"></i>
+            </button>
+            <div class="table-search">
+                <i class="bi bi-search"></i>
+                <input type="search" class="form-control" placeholder="Søg tekst eller source..." data-table-search autocomplete="off" value="@Model.SearchText" />
+            </div>
+        </div>
+    </div>
+
+    <div class="collapse mb-3" id="logsFilterPanel">
+        <div class="table-filter-panel" data-table-filter-panel>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Level</label>
+                    <select class="form-select" name="Level">
+                        <option value="">Alle</option>
+                        @foreach (var level in new[] { "Verbose", "Debug", "Information", "Warning", "Error", "Fatal" })
+                        {
+                            <option value="@level" selected="@(Model.Level == level)">@level</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Fra UTC</label>
+                    <input type="datetime-local" class="form-control" name="FromUtc" value="@(Model.FromUtc?.ToString("yyyy-MM-ddTHH:mm"))" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Til UTC</label>
+                    <input type="datetime-local" class="form-control" name="ToUtc" value="@(Model.ToUtc?.ToString("yyyy-MM-ddTHH:mm"))" />
+                </div>
+                <div class="col-md-3 d-flex align-items-end gap-2">
+                    <button type="button" class="btn btn-primary btn-icon" data-table-filter-save title="Gem filtre" aria-label="Gem filtre">
+                        <i class="bi bi-floppy2"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-icon" data-table-filter-reset title="Nulstil filtre" aria-label="Nulstil filtre">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div data-table-region>
+        @await Html.PartialAsync("_LogsTableBody", Model)
+    </div>
+</div>

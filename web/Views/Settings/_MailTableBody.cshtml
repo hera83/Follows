@@ -1,0 +1,101 @@
+@model web.ViewModels.MailFilterViewModel
+
+<div class="table-responsive">
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Status</th>
+                <th>Fra</th>
+                <th>Emne</th>
+                <th>Vedhæftninger</th>
+                <th>Modtaget</th>
+                <th class="text-end">Handlinger</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <tr>
+                    <td colspan="6" class="text-muted">Ingen mails fundet.</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var mail in Model.Items)
+                {
+                    <tr>
+                        <td>
+                            @if (mail.IsSeen)
+                            {
+                                <span class="badge-info"><i class="bi bi-envelope-open me-1"></i>Læst</span>
+                            }
+                            else
+                            {
+                                <span class="badge-ok"><i class="bi bi-envelope me-1"></i>Ulæst</span>
+                            }
+                        </td>
+                        <td>@mail.From</td>
+                        <td class="text-truncate" style="max-width: 320px;" title="@mail.Subject">@mail.Subject</td>
+                        <td>
+                            @if (mail.Attachments.Count == 0)
+                            {
+                                <span class="text-muted">–</span>
+                            }
+                            else
+                            {
+                                <div class="d-flex flex-column gap-1">
+                                    @foreach (var attachment in mail.Attachments)
+                                    {
+                                        <a class="text-decoration-none" href="@Url.Action("DownloadMailAttachment", new { uid = mail.Uid, fileName = attachment.FileName })" title="Download @attachment.FileName">
+                                            <i class="bi bi-paperclip me-1"></i>@attachment.FileName
+                                            <span class="text-muted small">(@((attachment.SizeBytes / 1024.0).ToString("0.#")) KB)</span>
+                                        </a>
+                                    }
+                                </div>
+                            }
+                        </td>
+                        <td>@mail.ReceivedAtUtc.ToLocalTime().ToString("g")</td>
+                        <td class="text-end">
+                            <div class="d-inline-flex gap-1">
+                                <button class="btn btn-sm btn-secondary" type="button" data-bs-toggle="modal" data-bs-target="#viewMailModal"
+                                        data-uid="@mail.Uid" title="Åbn" aria-label="Åbn">
+                                    <i class="bi bi-envelope-open"></i>
+                                </button>
+                                <button class="btn btn-sm btn-secondary" type="button" data-bs-toggle="modal" data-bs-target="#deleteMailModal"
+                                        data-uid="@mail.Uid" data-subject="@mail.Subject" title="Slet" aria-label="Slet">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="table-footer">
+    <p class="table-footer-count">
+        @if (Model.TotalCount == 0)
+        {
+            <text>Ingen resultater</text>
+        }
+        else
+        {
+            <text>Viser @(((Model.Page - 1) * Model.PageSize) + 1)-@(Math.Min(Model.Page * Model.PageSize, Model.TotalCount)) af @Model.TotalCount</text>
+        }
+    </p>
+    <div class="table-footer-end">
+        <span class="table-pagesize-label">Pr. side</span>
+        <select class="table-pagesize" data-table-page-size aria-label="Pr. side">
+            <option value="10" selected="@(Model.PageSize == 10)">10</option>
+            <option value="50" selected="@(Model.PageSize == 50)">50</option>
+            <option value="100" selected="@(Model.PageSize == 100)">100</option>
+        </select>
+        @await Html.PartialAsync("~/Views/Shared/Partials/_Pagination.cshtml", new web.ViewModels.PaginationViewModel
+        {
+            Page = Model.Page,
+            TotalPages = (int)Math.Ceiling(Model.TotalCount / (double)Model.PageSize)
+        })
+    </div>
+</div>

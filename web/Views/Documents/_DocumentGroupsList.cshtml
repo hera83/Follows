@@ -1,0 +1,33 @@
+@model web.ViewModels.DocumentsIndexViewModel
+
+@if (Model.Groups.Count == 0)
+{
+    <div class="doc-empty">
+        <i class="bi bi-folder2-open"></i>
+        <h2>Ingen grupper endnu</h2>
+        <p>Opret en gruppe (fx "Skoleskemaer" eller "Håndbold") for at komme i gang med at uploade dokumenter.</p>
+    </div>
+}
+else
+{
+    <div class="doc-groups-grid">
+        @foreach (var group in Model.Groups)
+        {
+            <div class="card doc-group-card">
+                <a class="doc-group-card-link" asp-action="Group" asp-route-id="@group.Id" title="Åbn @group.Name">
+                    <div class="doc-group-card-icon"><i class="bi bi-folder2-open"></i></div>
+                    <div class="doc-group-card-body">
+                        <h3 class="doc-group-card-name">@group.Name</h3>
+                        @if (!string.IsNullOrWhiteSpace(group.Description))
+                        {
+                            <p class="doc-group-card-desc">@group.Description</p>
+                        }
+                        <span class="doc-group-card-count">
+                            <i class="bi bi-file-earmark"></i> @group.DocumentCount dokument@(group.DocumentCount == 1 ? "" : "er")
+                        </span>
+                    </div>
+                </a>
+            </div>
+        }
+    </div>
+}

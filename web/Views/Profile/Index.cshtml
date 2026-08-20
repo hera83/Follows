@@ -1,0 +1,498 @@
+﻿@model web.ViewModels.ProfileViewModel
+@using web.Constants
+@using web.Data.Entities
+
+<div>
+    <div class="page-header">
+        <h1><i class="bi bi-person-circle me-2"></i>Min Profil</h1>
+        <p>Administrer dine personlige oplysninger og profilbillede</p>
+    </div>
+
+    <div class="d-flex flex-column gap-4">
+
+        <!-- Profilbillede -->
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-image"></i> Profilbillede
+            </div>
+            <div class="card-body">
+                <div class="d-flex flex-column flex-sm-row align-items-center gap-4">
+                    <div class="profile-avatar-wrapper flex-shrink-0" id="currentAvatarWrapper">
+                        @if (Model.HasAvatar)
+                        {
+                            <img id="currentAvatar"
+                                 src="@Url.Action("Avatar", "Profile")"
+                                 class="profile-avatar"
+                                 alt="Profilbillede" />
+                        }
+                        else
+                        {
+                            <div id="currentAvatar" class="profile-avatar-placeholder">
+                                <i class="bi bi-person-circle"></i>
+                            </div>
+                        }
+                    </div>
+                    <div class="flex-grow-1">
+                        <p class="text-muted small mb-3">
+                            Upload et billede som bruges som dit profilikon i menuen.<br />
+                            Billedet beskæres automatisk til cirkulær form (256 × 256 px).<br />
+                            Understøttede formater: JPEG, PNG, WebP &mdash; max 5 MB.
+                        </p>
+                        <div class="d-flex flex-wrap gap-2" id="avatarActionButtons">
+                            <button type="button" class="btn btn-secondary" id="btnSelectImage">
+                                <i class="bi bi-upload me-1"></i> Upload billede
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="btnCaptureImage">
+                                <i class="bi bi-camera me-1"></i> Tag billede
+                            </button>
+                            @if (Model.HasAvatar)
+                            {
+                                <form asp-action="DeleteAvatar" method="post" id="fjernBilledeForm">
+                                    @Html.AntiForgeryToken()
+                                    <button type="button" class="btn btn-danger"
+                                            data-bs-toggle="modal" data-bs-target="#fjernBilledeModal">
+                                        <i class="bi bi-trash me-1"></i> Fjern billede
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                </div>
+                <input type="file" id="avatarFileInput" accept="image/jpeg,image/png,image/webp" class="d-none" />
+            </div>
+        </div>
+
+        <!-- Tema -->
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-palette"></i> Tema
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Vælg dit foretrukne farvetema. <strong>System</strong> følger automatisk din enheds lyse/mørke indstilling.
+                </p>
+                <form asp-action="SetTheme" method="post" id="themeForm">
+                    @Html.AntiForgeryToken()
+                    <div class="theme-options">
+                        <label class="theme-option @(Model.ThemePreference == ThemeMode.System ? "active" : "")">
+                            <input type="radio" name="themePreference" value="@ThemeMode.System"
+                                   @(Model.ThemePreference == ThemeMode.System ? "checked" : "") />
+                            <i class="bi bi-circle-half"></i>
+                            <span>System</span>
+                        </label>
+                        <label class="theme-option @(Model.ThemePreference == ThemeMode.Light ? "active" : "")">
+                            <input type="radio" name="themePreference" value="@ThemeMode.Light"
+                                   @(Model.ThemePreference == ThemeMode.Light ? "checked" : "") />
+                            <i class="bi bi-sun"></i>
+                            <span>Lys</span>
+                        </label>
+                        <label class="theme-option @(Model.ThemePreference == ThemeMode.Dark ? "active" : "")">
+                            <input type="radio" name="themePreference" value="@ThemeMode.Dark"
+                                   @(Model.ThemePreference == ThemeMode.Dark ? "checked" : "") />
+                            <i class="bi bi-moon-stars"></i>
+                            <span>Mørk</span>
+                        </label>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Oplysninger -->
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-pencil-square"></i> Oplysninger
+            </div>
+            <div class="card-body">
+                <form asp-action="Edit" method="post" id="profileEditForm">
+                    @Html.AntiForgeryToken()
+
+                    <div class="row g-4">
+                        <div class="col-12 col-md-6">
+                            <label asp-for="EditForm.DisplayName" class="form-label"></label>
+                            <input asp-for="EditForm.DisplayName" class="form-control" autocomplete="name" />
+                            <span asp-validation-for="EditForm.DisplayName" class="field-validation-error"></span>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label asp-for="EditForm.UserName" class="form-label"></label>
+                            <input asp-for="EditForm.UserName" class="form-control" autocomplete="username"
+                                   placeholder="Ikke sat – email bruges ved login" />
+                            <div class="form-text text-muted">Bruges til at logge ind. Skal være unikt.</div>
+                            <span asp-validation-for="EditForm.UserName" class="field-validation-error"></span>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Email</label>
+                            <input type="text" class="form-control form-control-plaintext-styled"
+                                   value="@Model.Email" readonly tabindex="-1" />
+                            <div class="form-text text-muted">Email kan ikke ændres her.</div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label asp-for="EditForm.PhoneNumber" class="form-label"></label>
+                            <input asp-for="EditForm.PhoneNumber" class="form-control" autocomplete="tel" />
+                            <span asp-validation-for="EditForm.PhoneNumber" class="field-validation-error"></span>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label asp-for="EditForm.PreferredLanguage" class="form-label"></label>
+                            <select asp-for="EditForm.PreferredLanguage" class="form-select">
+                                @foreach (var lang in AppLanguages.All)
+                                {
+                                    <option value="@lang.Code" selected="@(lang.Code == Model.EditForm.PreferredLanguage)">@lang.NativeName</option>
+                                }
+                            </select>
+                            <span asp-validation-for="EditForm.PreferredLanguage" class="field-validation-error"></span>
+                        </div>
+                    </div>
+
+                    <hr class="my-4" />
+
+                    <p class="text-muted small mb-3">Udfyld kun nedenstående felter, hvis du vil ændre dit kodeord.</p>
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label asp-for="EditForm.NewPassword" class="form-label"></label>
+                            <input asp-for="EditForm.NewPassword" class="form-control" autocomplete="new-password" />
+                            <span asp-validation-for="EditForm.NewPassword" class="field-validation-error"></span>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label asp-for="EditForm.ConfirmNewPassword" class="form-label"></label>
+                            <input asp-for="EditForm.ConfirmNewPassword" class="form-control" autocomplete="new-password" />
+                            <span asp-validation-for="EditForm.ConfirmNewPassword" class="field-validation-error"></span>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-floppy2 me-1"></i> Gem
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Kamera modal -->
+<div class="modal fade" id="cameraModal" tabindex="-1" aria-labelledby="cameraModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cameraModalLabel">
+                    <i class="bi bi-camera me-2"></i>Tag billede
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body p-0 position-relative" style="background:#000;">
+                <video id="cameraVideo" autoplay playsinline muted
+                       style="width:100%;display:block;max-height:60vh;object-fit:contain;"></video>
+                <canvas id="cameraCanvas" style="display:none;"></canvas>
+            </div>
+            <div class="modal-footer justify-content-between">
+                <button type="button" class="btn btn-outline-secondary" id="btnSwitchCamera">
+                    <i class="bi bi-arrow-repeat me-1"></i> Skift kamera
+                </button>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i> Annuller
+                    </button>
+                    <button type="button" class="btn btn-primary" id="btnTakePhoto">
+                        <i class="bi bi-camera me-1"></i> Tag billede
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Crop modal -->
+<div class="modal fade" id="cropModal" tabindex="-1" aria-labelledby="cropModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cropModalLabel">
+                    <i class="bi bi-crop me-2"></i>Beskær profilbillede
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body">
+                <div class="crop-container">
+                    <img id="cropImage" src="" alt="Beskær billede" style="max-width:100%;" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i> Annuller
+                </button>
+                <button type="button" class="btn btn-primary" id="btnConfirmCrop">
+                    <i class="bi bi-floppy2 me-1"></i> Gem billede
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Fjern billede bekræftelse modal -->
+<div class="modal fade" id="fjernBilledeModal" tabindex="-1" aria-labelledby="fjernBilledeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="fjernBilledeModalLabel">
+                    <i class="bi bi-trash me-2"></i>Fjern profilbillede
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body">
+                Er du sikker på, at du vil fjerne dit profilbillede?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i> Annuller
+                </button>
+                <button type="button" class="btn btn-danger" id="btnConfirmFjernBillede">
+                    <i class="bi bi-trash me-1"></i> Fjern billede
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Besked modal -->
+<div class="modal fade" id="beskedModal" tabindex="-1" aria-labelledby="beskedModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="beskedModalLabel">
+                    <i class="bi bi-exclamation-circle me-2"></i>Besked
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body" id="beskedModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i> Luk
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+
+    <script>
+        (() => {
+            // Theme selector
+            const applyThemePreview = (mode) => {
+                document.documentElement.dataset.themeMode = mode;
+                let resolved = mode;
+                if (mode === 'System' || mode === 'system') {
+                    resolved = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+                }
+                document.documentElement.setAttribute('data-theme', resolved.toLowerCase());
+                document.querySelectorAll('.theme-option').forEach((label) => {
+                    label.classList.toggle('active', label.querySelector('input').value === mode);
+                });
+            };
+
+            const themeForm = document.getElementById('themeForm');
+            document.querySelectorAll('input[name="themePreference"]').forEach(radio => {
+                radio.addEventListener('change', async () => {
+                    applyThemePreview(radio.value);
+                    await window.FvForm.submit(themeForm);
+                });
+            });
+
+            // Profil-formular (visningsnavn, brugernavn, telefon, password)
+            const profileEditForm = document.getElementById('profileEditForm');
+            profileEditForm?.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const submitBtn = profileEditForm.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.disabled = true;
+                const data = await window.FvForm.submit(profileEditForm);
+                if (submitBtn) submitBtn.disabled = false;
+                if (data.success) {
+                    profileEditForm.querySelector('[name="EditForm.NewPassword"]').value = '';
+                    profileEditForm.querySelector('[name="EditForm.ConfirmNewPassword"]').value = '';
+                }
+            });
+
+            // Shared: open crop modal
+            const cropImage   = document.getElementById('cropImage');
+            const btnConfirm  = document.getElementById('btnConfirmCrop');
+            const cropModalEl = document.getElementById('cropModal');
+            const bsCropModal = new bootstrap.Modal(cropModalEl);
+            let cropper = null;
+
+            const bsBeskedModal = new bootstrap.Modal(document.getElementById('beskedModal'));
+            function showAlert(msg) {
+                document.getElementById('beskedModalBody').textContent = msg;
+                bsBeskedModal.show();
+            }
+
+            const bsFjernModal = new bootstrap.Modal(document.getElementById('fjernBilledeModal'));
+
+            function setAvatarUI(hasAvatar) {
+                const cacheBust = `?v=${Date.now()}`;
+                document.getElementById('currentAvatarWrapper').innerHTML = hasAvatar
+                    ? `<img id="currentAvatar" src="/Profile/Avatar${cacheBust}" class="profile-avatar" alt="Profilbillede" />`
+                    : `<div id="currentAvatar" class="profile-avatar-placeholder"><i class="bi bi-person-circle"></i></div>`;
+
+                const sidebarAvatar = document.getElementById('sidebarAvatarWrapper');
+                if (sidebarAvatar) {
+                    sidebarAvatar.innerHTML = hasAvatar
+                        ? `<img src="/Profile/Avatar${cacheBust}" class="menu-avatar" alt="Profilbillede" />`
+                        : '<i class="bi bi-person-circle"></i>';
+                }
+
+                const actions = document.getElementById('avatarActionButtons');
+                const existingForm = document.getElementById('fjernBilledeForm');
+                if (hasAvatar && !existingForm) {
+                    const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+                    actions.insertAdjacentHTML('beforeend', `
+                        <form action="/Profile/DeleteAvatar" method="post" id="fjernBilledeForm">
+                            <input name="__RequestVerificationToken" type="hidden" value="${token}" />
+                            <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#fjernBilledeModal">
+                                <i class="bi bi-trash me-1"></i> Fjern billede
+                            </button>
+                        </form>
+                    `);
+                    bindFjernForm();
+                } else if (!hasAvatar && existingForm) {
+                    existingForm.remove();
+                }
+            }
+
+            function bindFjernForm() {
+                const form = document.getElementById('fjernBilledeForm');
+                form?.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const data = await window.FvForm.submit(form);
+                    if (data.success) {
+                        bsFjernModal.hide();
+                        setAvatarUI(false);
+                    }
+                });
+            }
+
+            document.getElementById('btnConfirmFjernBillede')?.addEventListener('click', () => {
+                document.getElementById('fjernBilledeForm')?.requestSubmit();
+            });
+            bindFjernForm();
+
+            function openCropper(dataUrl) {
+                cropImage.src = dataUrl;
+                bsCropModal.show();
+            }
+
+            cropModalEl.addEventListener('shown.bs.modal', () => {
+                cropper = new Cropper(cropImage, {
+                    aspectRatio: 1, viewMode: 1, dragMode: 'move', autoCropArea: 0.9,
+                    restore: false, guides: false, center: true, highlight: false,
+                    cropBoxMovable: false, cropBoxResizable: false, toggleDragModeOnDblclick: false
+                });
+            });
+
+            cropModalEl.addEventListener('hidden.bs.modal', () => {
+                if (cropper) { cropper.destroy(); cropper = null; }
+            });
+
+            btnConfirm.addEventListener('click', () => {
+                if (!cropper) return;
+                btnConfirm.disabled = true;
+                btnConfirm.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Gemmer...';
+                cropper.getCroppedCanvas({ width: 256, height: 256 }).toBlob(async (blob) => {
+                    const formData = new FormData();
+                    formData.append('croppedImage', blob, 'avatar.jpg');
+                    const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+                    formData.append('__RequestVerificationToken', token);
+                    try {
+                        const res = await fetch('/Profile/UploadAvatar', { method: 'POST', body: formData });
+                        if (res.ok) {
+                            bsCropModal.hide();
+                            setAvatarUI(true);
+                            window.FvToast.show('success', 'Profilbillede opdateret.');
+                        }
+                        else { const data = await res.json().catch(() => ({})); showAlert(data.error || 'Upload fejlede.'); }
+                    } catch { showAlert('Netværksfejl.'); }
+                    finally {
+                        btnConfirm.disabled = false;
+                        btnConfirm.innerHTML = '<i class="bi bi-check-lg me-1"></i> Gem billede';
+                    }
+                }, 'image/jpeg', 0.92);
+            });
+
+            // Upload billede
+            const fileInput = document.getElementById('avatarFileInput');
+            document.getElementById('btnSelectImage').addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0]; fileInput.value = '';
+                if (!file) return;
+                if (file.size > 5 * 1024 * 1024) { showAlert('Max 5 MB.'); return; }
+                const reader = new FileReader();
+                reader.onload = (ev) => openCropper(ev.target.result);
+                reader.readAsDataURL(file);
+            });
+
+            // Kamera modal
+            const cameraModalEl = document.getElementById('cameraModal');
+            const bsCameraModal = new bootstrap.Modal(cameraModalEl);
+            const videoEl       = document.getElementById('cameraVideo');
+            const canvasEl      = document.getElementById('cameraCanvas');
+            const btnSwitch     = document.getElementById('btnSwitchCamera');
+            const btnTakePhoto  = document.getElementById('btnTakePhoto');
+            let cameras = [], currentCamIdx = 0, activeStream = null;
+
+            document.getElementById('btnCaptureImage').addEventListener('click', async () => {
+                cameras = await getUniqueCameras();
+                currentCamIdx = 0;
+                btnSwitch.style.display = cameras.length > 1 ? '' : 'none';
+                bsCameraModal.show();
+            });
+
+            async function getUniqueCameras() {
+                try {
+                    const tmp = await navigator.mediaDevices.getUserMedia({ video: true });
+                    tmp.getTracks().forEach(t => t.stop());
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const seen = new Set();
+                    return devices.filter(d => {
+                        if (d.kind !== 'videoinput') return false;
+                        const key = d.label || d.deviceId;
+                        if (seen.has(key)) return false;
+                        seen.add(key); return true;
+                    });
+                } catch { return []; }
+            }
+
+            async function startCamera(deviceId) {
+                if (activeStream) activeStream.getTracks().forEach(t => t.stop());
+                try {
+                    const c = deviceId ? { video: { deviceId: { exact: deviceId } } } : { video: { facingMode: 'user' } };
+                    activeStream = await navigator.mediaDevices.getUserMedia(c);
+                    videoEl.srcObject = activeStream;
+                } catch (err) { showAlert('Kamera fejl: ' + err.message); bsCameraModal.hide(); }
+            }
+
+            cameraModalEl.addEventListener('shown.bs.modal', () => startCamera(cameras[currentCamIdx]?.deviceId));
+            cameraModalEl.addEventListener('hidden.bs.modal', () => {
+                if (activeStream) { activeStream.getTracks().forEach(t => t.stop()); activeStream = null; }
+            });
+            btnSwitch.addEventListener('click', () => {
+                currentCamIdx = (currentCamIdx + 1) % cameras.length;
+                startCamera(cameras[currentCamIdx].deviceId);
+            });
+            btnTakePhoto.addEventListener('click', () => {
+                canvasEl.width  = videoEl.videoWidth  || 640;
+                canvasEl.height = videoEl.videoHeight || 480;
+                canvasEl.getContext('2d').drawImage(videoEl, 0, 0);
+                const dataUrl = canvasEl.toDataURL('image/jpeg', 0.95);
+                bsCameraModal.hide();
+                cameraModalEl.addEventListener('hidden.bs.modal', function onHidden() {
+                    cameraModalEl.removeEventListener('hidden.bs.modal', onHidden);
+                    openCropper(dataUrl);
+                });
+            });
+        })();
+    </script>
+}

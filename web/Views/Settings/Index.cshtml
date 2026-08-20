@@ -1,0 +1,116 @@
+@model web.ViewModels.SettingsIndexViewModel
+
+<div>
+    <div class="page-header">
+        <h1><i class="bi bi-gear me-2"></i>Indstillinger</h1>
+        <p>Administrer brugere, registrering, tema, Ollama, sms og systemlogs</p>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-transparent">
+            <ul class="nav nav-tabs card-header-tabs align-items-center" id="settingsTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users-pane" type="button" role="tab" aria-controls="users-pane" aria-selected="true">Brugere</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="registration-tab" data-bs-toggle="tab" data-bs-target="#registration-pane" type="button" role="tab" aria-controls="registration-pane" aria-selected="false">Registrering</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="theme-tab" data-bs-toggle="tab" data-bs-target="#theme-pane" type="button" role="tab" aria-controls="theme-pane" aria-selected="false">Tema</button>
+                </li>
+                @if (Model.ShowOllamaTab)
+                {
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="ollama-tab" data-bs-toggle="tab" data-bs-target="#ollama-pane" type="button" role="tab" aria-controls="ollama-pane" aria-selected="false">Ollama</button>
+                    </li>
+                }
+                @if (Model.ShowAiGatewayTab)
+                {
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="aigateway-tab" data-bs-toggle="tab" data-bs-target="#aigateway-pane" type="button" role="tab" aria-controls="aigateway-pane" aria-selected="false">AiGateway</button>
+                    </li>
+                }
+                @if (Model.ShowSmsTab)
+                {
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="sms-tab" data-bs-toggle="tab" data-bs-target="#sms-pane" type="button" role="tab" aria-controls="sms-pane" aria-selected="false">Sms</button>
+                    </li>
+                }
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="mail-tab" data-bs-toggle="tab" data-bs-target="#mail-pane" type="button" role="tab" aria-controls="mail-pane" aria-selected="false">Mail</button>
+                </li>
+                <li class="nav-item ms-auto" role="presentation">
+                    <button class="nav-link" id="logs-tab" data-bs-toggle="tab" data-bs-target="#logs-pane" type="button" role="tab" aria-controls="logs-pane" aria-selected="false">Logs</button>
+                </li>
+            </ul>
+        </div>
+        <div class="card-body">
+            <div class="tab-content" id="settingsTabsContent">
+                <div class="tab-pane fade show active" id="users-pane" role="tabpanel" aria-labelledby="users-tab" tabindex="0" data-tab-endpoint="@Url.Action("UsersTabContent")">
+                    @await Html.PartialAsync("_UsersTab", Model.Users)
+                </div>
+                <div class="tab-pane fade" id="registration-pane" role="tabpanel" aria-labelledby="registration-tab" tabindex="0" data-tab-endpoint="@Url.Action("RegistrationTabContent")"></div>
+                <div class="tab-pane fade" id="theme-pane" role="tabpanel" aria-labelledby="theme-tab" tabindex="0" data-tab-endpoint="@Url.Action("ThemeTabContent")"></div>
+                @if (Model.ShowOllamaTab)
+                {
+                    <div class="tab-pane fade" id="ollama-pane" role="tabpanel" aria-labelledby="ollama-tab" tabindex="0" data-tab-endpoint="@Url.Action("OllamaTabContent")"></div>
+                }
+                @if (Model.ShowAiGatewayTab)
+                {
+                    <div class="tab-pane fade" id="aigateway-pane" role="tabpanel" aria-labelledby="aigateway-tab" tabindex="0" data-tab-endpoint="@Url.Action("AiGatewayTabContent")"></div>
+                }
+                @if (Model.ShowSmsTab)
+                {
+                    <div class="tab-pane fade" id="sms-pane" role="tabpanel" aria-labelledby="sms-tab" tabindex="0" data-tab-endpoint="@Url.Action("SmsTabContent")"></div>
+                }
+                <div class="tab-pane fade" id="mail-pane" role="tabpanel" aria-labelledby="mail-tab" tabindex="0" data-tab-endpoint="@Url.Action("MailTabContent")"></div>
+                <div class="tab-pane fade" id="logs-pane" role="tabpanel" aria-labelledby="logs-tab" tabindex="0" data-tab-endpoint="@Url.Action("LogsTabContent")"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (() => {
+        // Hver fane (undtagen Brugere, som allerede er indlæst ved sidens indlæsning) henter
+        // sit indhold via AJAX første gang den vises, og genindlæses hver gang den vises igen,
+        // så Indstillinger-siden ikke skal vente på fx Ollama/SMS-gatewayen ved hver visning.
+        const executeScripts = (container) => {
+            container.querySelectorAll('script').forEach((oldScript) => {
+                const newScript = document.createElement('script');
+                Array.from(oldScript.attributes).forEach((attr) => newScript.setAttribute(attr.name, attr.value));
+                newScript.textContent = oldScript.textContent;
+                oldScript.replaceWith(newScript);
+            });
+        };
+
+        const loadTabPane = async (pane) => {
+            const endpoint = pane.dataset.tabEndpoint;
+            if (!endpoint || pane.dataset.tabLoading === 'true') return;
+
+            pane.dataset.tabLoading = 'true';
+            pane.innerHTML = '<div class="text-center text-muted py-5"><span class="spinner-border spinner-border-sm me-2"></span>Indlæser...</div>';
+
+            try {
+                const res = await fetch(endpoint, { headers: { 'X-Requested-With': 'fetch' } });
+                if (!res.ok) throw new Error('tab fetch failed');
+                const html = await res.text();
+                pane.innerHTML = html;
+                window.FvDataTable?.initAll(pane);
+                window.FvChat?.initAll(pane);
+                executeScripts(pane);
+            } catch {
+                pane.innerHTML = '<div class="text-danger p-3">Kunne ikke indlæse indholdet. Forsøg igen.</div>';
+            } finally {
+                pane.dataset.tabLoading = 'false';
+            }
+        };
+
+        document.querySelectorAll('#settingsTabs button[data-bs-toggle="tab"]').forEach((btn) => {
+            btn.addEventListener('shown.bs.tab', () => {
+                const pane = document.querySelector(btn.getAttribute('data-bs-target'));
+                if (pane) loadTabPane(pane);
+            });
+        });
+    })();
+</script>

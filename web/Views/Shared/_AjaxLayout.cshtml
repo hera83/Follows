@@ -1,0 +1,5 @@
+<div data-ajax-content>
+    @await Html.PartialAsync("~/Views/Shared/Partials/_Toast.cshtml")
+    @RenderBody()
+    @await RenderSectionAsync("Scripts", required: false)
+</div>

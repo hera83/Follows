@@ -1,0 +1,29 @@
+@{
+    var toasts = new[]
+    {
+        new { Key = "SuccessMessage", Css = "fv-toast-success", Icon = "bi-check-circle-fill", Delay = 3000 },
+        new { Key = "InfoMessage",    Css = "fv-toast-info",    Icon = "bi-info-circle-fill",  Delay = 3000 },
+        new { Key = "WarningMessage", Css = "fv-toast-warn",    Icon = "bi-exclamation-triangle-fill", Delay = 10000 },
+        new { Key = "ErrorMessage",   Css = "fv-toast-error",   Icon = "bi-x-circle-fill",     Delay = 10000 }
+    };
+}
+
+@if (toasts.Any(t => TempData[t.Key] is not null))
+{
+    <div id="toast-container">
+        @foreach (var t in toasts)
+        {
+            var text = TempData[t.Key]?.ToString();
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                <div class="fv-toast @t.Css" data-delay="@t.Delay">
+                    <i class="bi @t.Icon fv-toast-icon"></i>
+                    <span>@text</span>
+                    <button class="fv-toast-close" type="button" aria-label="Luk">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+            }
+        }
+    </div>
+}

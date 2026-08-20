@@ -1,0 +1,112 @@
+@using web.Constants
+@using web.Data
+@using web.Data.Entities
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@{
+    var currentUser = await UserManager.GetUserAsync(User);
+    var currentUserId = currentUser?.Id;
+    var hasAvatar = currentUser?.ProfilePictureId.HasValue == true;
+
+    // Use per-user theme preference; fall back to global app setting
+    var themeMode = currentUser?.ThemePreference;
+    if (string.IsNullOrEmpty(themeMode))
+    {
+        themeMode = await Db.AppSettings
+            .AsNoTracking()
+            .Where(s => s.Key == AppSettingKeys.ActiveThemeMode)
+            .Select(s => s.Value)
+            .FirstOrDefaultAsync() ?? ThemeMode.System;
+    }
+}
+<!DOCTYPE html>
+<html lang="da" data-theme-mode="@themeMode">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Follows</title>
+    <script>
+        (function () {
+            var mode = (document.documentElement.dataset.themeMode || 'system').toLowerCase();
+            var theme;
+            if (mode === 'light') { theme = 'light'; }
+            else if (mode === 'dark') { theme = 'dark'; }
+            else { theme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'; }
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+    <script type="importmap"></script>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" id="themeStylesheet" href="~/theme.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/web.styles.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="app-shell" id="appShell">
+        <nav class="side-menu" id="sideMenu" aria-label="Hovedmenu">
+            <div class="side-menu-top">
+                <button id="sidebarToggle" class="menu-item menu-brand" type="button" aria-label="Fold menu">
+                    <span class="menu-icon"><i class="bi bi-chat-heart-fill"></i></span>
+                    <span class="menu-text">Follows</span>
+                </button>
+
+                <div class="menu-nav">
+                    <a class="menu-item" asp-controller="Feed" asp-action="Index" title="Feeds">
+                        <span class="menu-icon"><i class="bi bi-images"></i></span>
+                        <span class="menu-text">Feeds</span>
+                    </a>
+                    <a class="menu-item" asp-controller="Documents" asp-action="Index" title="Documents">
+                        <span class="menu-icon"><i class="bi bi-folder2-open"></i></span>
+                        <span class="menu-text">Documents</span>
+                    </a>
+                </div>
+            </div>
+
+            <div class="side-menu-bottom">
+                <a class="menu-item" asp-controller="Profile" asp-action="Index" title="Min Profil">
+                    <span class="menu-icon" id="sidebarAvatarWrapper">
+                        @if (hasAvatar && currentUserId is not null)
+                        {
+                            <img src="@Url.Action("Avatar", "Profile", new { userId = currentUserId })"
+                                 class="menu-avatar" alt="Profilbillede" />
+                        }
+                        else
+                        {
+                            <i class="bi bi-person-circle"></i>
+                        }
+                    </span>
+                    <span class="menu-text">Min Profil</span>
+                </a>
+                @if (User.IsInRole(AppRoles.Developer) || User.IsInRole(AppRoles.Administrator))
+                {
+                    <a class="menu-item" asp-controller="Settings" asp-action="Index" title="Indstillinger">
+                        <span class="menu-icon"><i class="bi bi-gear"></i></span>
+                        <span class="menu-text">Indstillinger</span>
+                    </a>
+                }
+                <form asp-controller="Account" asp-action="Logout" method="post" class="menu-form">
+                    <button type="submit" class="menu-item menu-item-logout w-100" title="Log ud">
+                        <span class="menu-icon"><i class="bi bi-box-arrow-right"></i></span>
+                        <span class="menu-text">Log ud</span>
+                    </button>
+                </form>
+            </div>
+        </nav>
+
+        <div class="app-content">
+            @await Html.PartialAsync("~/Views/Shared/Partials/_Toast.cshtml")
+            @RenderBody()
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/data-table.js" asp-append-version="true"></script>
+    <script src="~/js/chat.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

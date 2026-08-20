@@ -1,0 +1,4 @@
+﻿@{
+    var isAjax = Context.Request.Headers["X-Ajax-Navigation"].ToString() == "true";
+    Layout = isAjax ? "~/Views/Shared/_AjaxLayout.cshtml" : "_Layout";
+}

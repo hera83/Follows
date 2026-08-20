@@ -1,0 +1,120 @@
+@using web.Infrastructure
+@model web.ViewModels.OllamaSettingsViewModel
+
+<div class="row g-3 mb-3">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <i class="bi @(Model.IsOnline ? "bi-check-circle-fill text-success" : "bi-x-circle-fill text-danger") fs-3"></i>
+                <div>
+                    <div class="ollama-card-label">@(Model.IsOnline ? "Online" : "Offline")</div>
+                    <div class="text-muted small">
+                        @if (Model.IsOnline)
+                        {
+                            <text>Ollama - v. @Model.Version</text>
+                        }
+                        else
+                        {
+                            <text>@(Model.ErrorMessage ?? "Kunne ikke forbinde til serveren.") (@Model.BaseUrl)</text>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="ollama-card-label mb-1">Konfigureret standardmodel</div>
+                <div class="text-muted small">@(string.IsNullOrWhiteSpace(Model.DefaultChatModel) ? "Ingen sat" : Model.DefaultChatModel)</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .ollama-card-label {
+        color: var(--clr-text);
+        font-weight: 600;
+    }
+</style>
+
+<div class="card mb-3">
+    <div class="card-header"><strong>Aktive modeller</strong></div>
+    <div class="card-body p-0" id="ollamaRunningModelsBody">
+        @await Html.PartialAsync("_OllamaRunningModelsTableBody", Model)
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><strong>Installerede modeller</strong></div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Navn</th>
+                        <th>Parametre</th>
+                        <th>Quantization</th>
+                        <th>Størrelse</th>
+                        <th>Ændret</th>
+                        <th class="text-end">Handlinger</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.IsOnline)
+                    {
+                        <tr><td colspan="6" class="text-muted">Serveren er offline.</td></tr>
+                    }
+                    else if (Model.InstalledModels.Count == 0)
+                    {
+                        <tr><td colspan="6" class="text-muted">Ingen modeller installeret.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var m in Model.InstalledModels)
+                        {
+                            <tr>
+                                <td>
+                                    @m.Name
+                                    @if (m.IsRunning)
+                                    {
+                                        <span class="badge-ok ms-1">Aktiv</span>
+                                    }
+                                </td>
+                                <td>@(m.ParameterSize ?? "–")</td>
+                                <td>@(m.QuantizationLevel ?? "–")</td>
+                                <td>@ByteSizeFormatter.Format(m.Size)</td>
+                                <td>@(m.ModifiedAt?.ToLocalTime().ToString("g") ?? "–")</td>
+                                <td class="text-end">
+                                    <div class="d-inline-flex gap-1">
+                                        <button class="btn btn-sm btn-secondary btn-icon" type="button" data-ollama-load
+                                                data-name="@m.Name" disabled="@m.IsRunning"
+                                                title="@(m.IsRunning ? "Modellen er allerede indlæst" : "Indlæs i hukommelse")" aria-label="Indlæs i hukommelse">
+                                            <i class="bi bi-play-circle"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-secondary btn-icon" type="button" data-ollama-unload
+                                                data-name="@m.Name" disabled="@(!m.IsRunning)"
+                                                title="@(m.IsRunning ? "Fjern fra hukommelse" : "Modellen er ikke indlæst")" aria-label="Fjern fra hukommelse">
+                                            <i class="bi bi-stop-circle"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-secondary btn-icon" type="button" data-ollama-refresh
+                                                data-name="@m.Name" disabled="@m.IsRunning"
+                                                title="@(m.IsRunning ? "Fjern modellen fra hukommelsen før opdatering" : "Opdater model fra Ollama (pull)")" aria-label="Opdater model fra Ollama">
+                                            <i class="bi bi-arrow-clockwise"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#deleteOllamaModelModal"
+                                                data-name="@m.Name" disabled="@m.IsRunning"
+                                                title="@(m.IsRunning ? "Fjern modellen fra hukommelsen før sletning" : "Slet")" aria-label="Slet">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

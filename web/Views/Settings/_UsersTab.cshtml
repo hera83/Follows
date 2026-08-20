@@ -1,0 +1,245 @@
+@using web.Constants
+@model web.ViewModels.UserFilterViewModel
+
+<div data-table-root id="usersTableRoot" data-table-endpoint="@Url.Action("UsersTable")">
+    <div class="table-toolbar mb-3">
+        <div class="table-toolbar-start">
+            <button class="btn btn-icon btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#usersFilterPanel" title="Filtre" aria-label="Filtre">
+                <i class="bi bi-funnel"></i>
+            </button>
+            <div class="table-search">
+                <i class="bi bi-search"></i>
+                <input type="search" class="form-control" placeholder="Søg navn eller email..." data-table-search autocomplete="off" />
+            </div>
+        </div>
+        <div class="table-toolbar-end">
+            <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#createUserModal" title="Opret bruger" aria-label="Opret bruger">
+                <i class="bi bi-person-plus"></i> Opret
+            </button>
+        </div>
+    </div>
+
+    <div class="collapse mb-3" id="usersFilterPanel">
+        <div class="table-filter-panel" data-table-filter-panel>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Rolle</label>
+                    <select class="form-select" name="Role">
+                        <option value="">Alle</option>
+                        @foreach (var role in AppRoles.GetAllRolesWithLabels())
+                        {
+                            <option value="@role.Key">@role.Value</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" name="IsActive">
+                        <option value="">Alle</option>
+                        <option value="true">Aktiv</option>
+                        <option value="false">Deaktiveret</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end gap-2">
+                    <button type="button" class="btn btn-primary btn-icon" data-table-filter-save title="Gem filtre" aria-label="Gem filtre">
+                        <i class="bi bi-floppy2"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-icon" data-table-filter-reset title="Nulstil filtre" aria-label="Nulstil filtre">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div data-table-region>
+        @await Html.PartialAsync("_UsersTableBody", Model)
+    </div>
+</div>
+
+<!-- Opret bruger modal -->
+<div class="modal fade" id="createUserModal" tabindex="-1" aria-labelledby="createUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form asp-action="CreateUser" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createUserModalLabel"><i class="bi bi-person-plus me-2"></i>Opret bruger</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Visningsnavn</label>
+                            <input name="DisplayName" class="form-control" required />
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Email</label>
+                            <input name="Email" type="email" class="form-control" required />
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Telefonnummer</label>
+                            <input name="PhoneNumber" type="tel" class="form-control" />
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Rolle</label>
+                            <select name="Role" class="form-select">
+                                @foreach (var role in AppRoles.GetAllRolesWithLabels())
+                                {
+                                    <option value="@role.Key" selected="@(role.Key == AppRoles.User)">@role.Value</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Password</label>
+                            <input name="Password" type="password" class="form-control" required minlength="6" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i> Annuller
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-floppy2 me-1"></i> Gem
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Rediger bruger modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form asp-action="EditUser" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="Id" id="editUserId" />
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editUserModalLabel"><i class="bi bi-pencil me-2"></i>Rediger bruger</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Visningsnavn</label>
+                            <input name="DisplayName" id="editUserDisplayName" class="form-control" required />
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Email</label>
+                            <input name="Email" id="editUserEmail" type="email" class="form-control" required />
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Telefonnummer</label>
+                            <input name="PhoneNumber" id="editUserPhoneNumber" type="tel" class="form-control" />
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Rolle</label>
+                            <select name="Role" id="editUserRole" class="form-select">
+                                @foreach (var roleOption in AppRoles.GetAllRolesWithLabels())
+                                {
+                                    <option value="@roleOption.Key">@roleOption.Value</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Status</label>
+                            <select name="IsActive" id="editUserIsActive" class="form-select">
+                                <option value="true">Aktiv</option>
+                                <option value="false">Deaktiveret</option>
+                            </select>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Password</label>
+                            <input name="Password" type="password" class="form-control" minlength="6" placeholder="Lad stå tomt for at bevare nuværende password" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i> Annuller
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-floppy2 me-1"></i> Gem
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Slet bruger modal -->
+<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteUserModalLabel"><i class="bi bi-trash me-2"></i>Slet bruger</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+            </div>
+            <div class="modal-body">
+                Er du sikker på, at du vil slette brugeren <strong id="deleteUserName"></strong>? Denne handling kan ikke fortrydes.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i> Annuller
+                </button>
+                <form asp-action="DeleteUser" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" id="deleteUserId" />
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash me-1"></i> Slet
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (() => {
+        const usersRoot = document.getElementById('usersTableRoot');
+
+        const handleAjaxSubmit = (form, modalEl) => {
+            if (!form) return;
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.disabled = true;
+                const data = await window.FvForm.submit(form);
+                if (submitBtn) submitBtn.disabled = false;
+                if (data.success) {
+                    if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+                    form.reset();
+                    window.FvDataTable?.reload(usersRoot);
+                }
+            });
+        };
+
+        const createUserModal = document.getElementById('createUserModal');
+        handleAjaxSubmit(createUserModal?.querySelector('form'), createUserModal);
+
+        const editUserModal = document.getElementById('editUserModal');
+        handleAjaxSubmit(editUserModal?.querySelector('form'), editUserModal);
+        editUserModal?.addEventListener('show.bs.modal', (event) => {
+            const btn = event.relatedTarget;
+            if (!btn) return;
+            document.getElementById('editUserId').value = btn.dataset.id;
+            document.getElementById('editUserEmail').value = btn.dataset.email;
+            document.getElementById('editUserDisplayName').value = btn.dataset.displayname;
+            document.getElementById('editUserPhoneNumber').value = btn.dataset.phonenumber || '';
+            document.getElementById('editUserIsActive').value = btn.dataset.isactive;
+            document.getElementById('editUserRole').value = btn.dataset.role;
+            editUserModal.querySelector('input[name="Password"]').value = '';
+        });
+
+        const deleteUserModal = document.getElementById('deleteUserModal');
+        handleAjaxSubmit(deleteUserModal?.querySelector('form'), deleteUserModal);
+        deleteUserModal?.addEventListener('show.bs.modal', (event) => {
+            const btn = event.relatedTarget;
+            if (!btn) return;
+            document.getElementById('deleteUserId').value = btn.dataset.id;
+            document.getElementById('deleteUserName').textContent = btn.dataset.name;
+        });
+    })();
+</script>

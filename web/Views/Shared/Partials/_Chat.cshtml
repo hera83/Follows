@@ -1,0 +1,41 @@
+@model web.ViewModels.ChatWidgetViewModel
+
+<div class="chat-widget" id="@Model.Id"
+     @(Model.EnableTts ? Html.Raw($"data-tts-action=\"{Url.Action("SynthesizeSpeech", "Chat")}\"") : null)
+     @(Model.EnableStt ? Html.Raw($"data-stt-action=\"{Url.Action("TranscribeSpeech", "Chat")}\"") : null)>
+    <div class="chat-widget-header">
+        <i class="bi bi-robot chat-widget-header-icon"></i>
+        <div class="chat-widget-header-text">
+            <span class="chat-widget-title">@Model.Title</span>
+            @if (!string.IsNullOrWhiteSpace(Model.Model))
+            {
+                <span class="chat-widget-subtitle">@Model.Model</span>
+            }
+        </div>
+        <button type="button" class="chat-widget-clear" data-chat-clear title="Ryd samtale" aria-label="Ryd samtale">
+            <i class="bi bi-eraser"></i>
+        </button>
+    </div>
+
+    <div class="chat-widget-messages" id="@(Model.Id)-messages">
+        <div class="chat-widget-hint text-muted small">Skriv en besked for at starte samtalen.</div>
+    </div>
+
+    <form class="chat-widget-form" id="@(Model.Id)-form" action="@Url.Action(Model.Action, Model.Controller)" method="post">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="Model" value="@Model.Model" />
+        <input type="hidden" name="HistoryJson" />
+        <div class="chat-widget-input-row">
+            @if (Model.EnableStt)
+            {
+                <button type="button" class="btn btn-secondary chat-widget-mic" data-chat-mic title="Start samtale" aria-label="Start samtale">
+                    <i class="bi bi-mic"></i>
+                </button>
+            }
+            <textarea name="Message" class="chat-widget-input" rows="1" placeholder="Skriv en besked..." required></textarea>
+            <button type="submit" class="btn btn-primary chat-widget-send" title="Send" aria-label="Send">
+                <i class="bi bi-send"></i>
+            </button>
+        </div>
+    </form>
+</div>
