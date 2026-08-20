@@ -27,7 +27,10 @@ RUN apt-get update \
 # Run as a non-root user. App_dbs/App_files are created here (owned by the
 # app user) so that Docker seeds any named volume mounted over them with the
 # same ownership on first start — see docker-compose.yml.
-RUN groupadd -r app && useradd -r -g app -m app \
+# The base image already ships a non-root "app" user/group on some tags, so
+# creation is made idempotent instead of assuming a clean slate.
+RUN (getent group app >/dev/null || groupadd -r app) \
+    && (id -u app >/dev/null 2>&1 || useradd -r -g app -m app) \
     && mkdir -p /app/App_dbs /app/App_files \
     && chown -R app:app /app
 
