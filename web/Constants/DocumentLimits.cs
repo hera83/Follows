@@ -32,6 +32,36 @@ namespace web.Constants
             || contentType == "text/plain"
             || contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// Content types the "Oversæt"-button can pull text out of: PDF, plain text, and modern
+        /// (OOXML, zip-based) Word/Excel/PowerPoint. Excluded: images (no OCR step, so no text to
+        /// translate) and legacy binary Office formats (.doc/.xls/.ppt) — DocumentFormat.OpenXml only
+        /// reads the OOXML formats.
+        /// </summary>
+        public static bool CanExtractText(string contentType) =>
+            contentType == "application/pdf"
+            || contentType == "text/plain"
+            || contentType == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            || contentType == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            || contentType == "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+        /// <summary>
+        /// Upper bound on how much extracted text is sent to the translation model in one go. Long
+        /// documents are truncated to this many characters — the caller is told so it can flag it to the
+        /// user — to stay within typical local-model context limits.
+        /// </summary>
+        public const int MaxTranslatableChars = 20_000;
+
+        /// <summary>
+        /// Extracted text is translated in chunks of roughly this many characters, split at paragraph/
+        /// table boundaries — sending a whole long document as one prompt risks silently running out of
+        /// the model's context window mid-generation (Ollama just stops, with no error), which reads as
+        /// "only the first third got translated". Small chunks leave the model plenty of context headroom
+        /// (some models spend a chunk of their budget on hidden reasoning before answering — see
+        /// LanguageTools.TranslateDocumentToMarkdownAsync) and translate completely every time.
+        /// </summary>
+        public const int TranslationChunkChars = 1_800;
+
         /// <summary>Bootstrap Icons class for a document row, chosen from its content type.</summary>
         public static string IconClassFor(string contentType) => contentType switch
         {

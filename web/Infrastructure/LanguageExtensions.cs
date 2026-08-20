@@ -60,6 +60,51 @@ namespace web.Infrastructure
         }
 
         /// <summary>
+        /// Oversætter <paramref name="content"/> (plain text pulled from a document — a PDF, Word/Excel/
+        /// PowerPoint file, etc.) til <paramref name="targetLanguage"/> og formaterer resultatet som
+        /// Markdown undervejs: overskrifter, lister og tabeller (GFM pipe-tabeller) bevares/genskabes hvis
+        /// kildeteksten indeholder dem, så visningen bliver læsbar frem for én lang klump tekst.
+        /// </summary>
+        public Task<string> TranslateDocumentToMarkdownAsync(
+            string content,
+            string targetLanguage,
+            string? sourceLanguage = null,
+            string? model = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(content))
+                return Task.FromResult(string.Empty);
+
+            var sourceClause = string.IsNullOrWhiteSpace(sourceLanguage) ? string.Empty : $" fra {sourceLanguage}";
+            var systemPrompt =
+                $"Du er en oversætter og formatterer. Oversæt teksten brugeren sender{sourceClause} til {targetLanguage}, " +
+                "og formater resultatet som pænt Markdown. Teksten stammer fra et dokument og kan indeholde løs " +
+                "struktur fra den oprindelige side- eller celleopdeling - genskab den som Markdown: overskrifter med #, " +
+                "punktlister eller nummererede lister, og tabeldata som Markdown-tabeller (pipe-syntaks med skillelinje). " +
+                "Bevar al indhold og rækkefølge. Svar direkte med selve den oversatte Markdown-tekst med det samme - " +
+                "ræsonnér ikke trin for trin og forklar ikke dine overvejelser først. Svar udelukkende med den " +
+                "oversatte Markdown-tekst - ingen indledning, ingen forklaringer, ingen kodeblok-indpakning (```) om " +
+                "hele svaret.";
+
+            // Dokument-tekst er typisk meget længere end en kort oversættelse/opsummering. Ollamas
+            // standard num_ctx er ofte kun 2048 tokens medmindre modellens Modelfile sætter noget
+            // andet - rigeligt til en sætning, men ikke til et helt dokument-chunk plus dets oversatte
+            // Markdown-output. Uden dette sætter generering simpelthen bare i stå midt i svaret, uden
+            // fejl, når konteksten løber tør (det er derfor DocumentsService også deler lange dokumenter
+            // op i chunks - de to ting er hinandens sikkerhedsnet, ikke alternativer).
+            //
+            // "Tænkende" modeller (se CleanResponse-kommentaren nedenfor om gemma4:12b) kan bruge hele
+            // budgettet på et <think>-ræsonnement og aldrig nå frem til selve svaret, hvilket - efter
+            // CleanResponse har fjernet <think>-blokken - ser ud som et tomt svar. AiGatewayen har ingen
+            // "think: false"-mulighed at sende videre til Ollama (se dens swagger: ChatRequestDto har
+            // ingen think-felt og additionalProperties: false), så der er ingen API-vej til at slå det
+            // fra herfra - kun den eksplicitte instruks ovenfor i systemPrompt om at svare direkte.
+            var options = new OllamaOptionsDto { Temperature = 0.2, NumCtx = 16384, NumPredict = -1 };
+
+            return CompleteAsync(systemPrompt, content, model, options, cancellationToken);
+        }
+
+        /// <summary>
         /// Genkender hvilket sprog <paramref name="text"/> er skrevet på og returnerer sprognavnet på dansk
         /// (fx "Dansk", "Engelsk").
         /// </summary>
@@ -77,6 +122,20 @@ namespace web.Infrastructure
 
             var result = await CompleteAsync(systemPrompt, text, model, cancellationToken);
             return result.TrimEnd('.', ' ');
+        }
+
+        /// <summary>
+        /// Same as <see cref="DetectLanguageAsync"/>, but maps the answer straight to a
+        /// <see cref="web.Constants.AppLanguages"/> code (e.g. "en") instead of the raw Danish name.
+        /// Returns null if detection came back empty or didn't match a known language name.
+        /// </summary>
+        public async Task<string?> DetectLanguageCodeAsync(
+            string text,
+            string? model = null,
+            CancellationToken cancellationToken = default)
+        {
+            var detectedName = await DetectLanguageAsync(text, model, cancellationToken);
+            return web.Constants.AppLanguages.CodeFromDanishName(detectedName);
         }
 
         /// <summary>
@@ -204,10 +263,17 @@ namespace web.Infrastructure
         // Fælles kald mod AiGatewayens Ollama-chat: slår DefaultChatModel op hvis intet model-navn er
         // angivet, sender system+user-besked med lav temperatur, og rydder op i svaret. Samme
         // model-opløsningsmønster som ChatController bruger mod chat-UI'en.
+        private Task<string> CompleteAsync(string systemPrompt, string userPrompt, string? model, CancellationToken cancellationToken)
+            => CompleteAsync(systemPrompt, userPrompt, model, options: null, cancellationToken);
+
+        // Overload der lader kaldere override Ollama-options (fx num_ctx/num_predict for lange
+        // dokument-oversættelser, se TranslateDocumentToMarkdownAsync) - falder tilbage til den
+        // simple lav-temperatur-opsætning, når intet er angivet.
         private async Task<string> CompleteAsync(
             string systemPrompt,
             string userPrompt,
             string? model,
+            OllamaOptionsDto? options,
             CancellationToken cancellationToken)
         {
             var resolvedModel = model;
@@ -232,7 +298,7 @@ namespace web.Infrastructure
                     new() { Role = "system", Content = systemPrompt },
                     new() { Role = "user", Content = userPrompt }
                 },
-                Options = new OllamaOptionsDto { Temperature = 0.2 }
+                Options = options ?? new OllamaOptionsDto { Temperature = 0.2 }
             }, cancellationToken);
 
             return CleanResponse(response.Message?.Content);

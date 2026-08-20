@@ -41,6 +41,9 @@ namespace web.ViewModels
         public DateTime CreatedAtUtc { get; set; }
         public bool CanPreviewInline { get; set; }
 
+        /// <summary>True when the "Oversæt"-button can extract text from this file's content type.</summary>
+        public bool CanTranslate { get; set; }
+
         /// <summary>True when the current user uploaded this document, or is an admin/developer.</summary>
         public bool CanDelete { get; set; }
     }

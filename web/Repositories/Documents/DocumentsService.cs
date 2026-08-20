@@ -2,8 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using web.Constants;
 using web.Data;
 using web.Data.Entities;
+using web.Infrastructure;
 using web.Repositories.Documents.Dtos;
 using web.Repositories.Documents.Interfaces;
+using web.Services.AiGateway.Interfaces;
 
 namespace web.Repositories.Documents
 {
@@ -13,17 +15,21 @@ namespace web.Repositories.Documents
         private readonly IWebHostEnvironment _env;
         private readonly IConfiguration _config;
         private readonly ILogger<DocumentsService> _logger;
+        private readonly LanguageTools _language;
 
         public DocumentsService(
             ApplicationDbContext context,
             IWebHostEnvironment env,
             IConfiguration config,
-            ILogger<DocumentsService> logger)
+            ILogger<DocumentsService> logger,
+            IAiGatewayService aiGatewayService,
+            IAiGatewayConfigurationProvider aiGatewayConfigurationProvider)
         {
             _context = context;
             _env = env;
             _config = config;
             _logger = logger;
+            _language = aiGatewayService.Language(aiGatewayConfigurationProvider);
         }
 
         public async Task<List<DocumentGroupDto>> GetGroupsAsync(CancellationToken ct = default)
@@ -72,6 +78,7 @@ namespace web.Repositories.Documents
                     UploadedByDisplayName = uploaders.GetValueOrDefault(d.UploadedByUserId, "Ukendt bruger"),
                     CreatedAtUtc = d.CreatedAtUtc,
                     CanPreviewInline = DocumentLimits.CanPreviewInline(d.File?.ContentType ?? string.Empty),
+                    CanTranslate = DocumentLimits.CanExtractText(d.File?.ContentType ?? string.Empty),
                     CanDelete = d.UploadedByUserId == currentUserId || isModerator
                 }).ToList()
             };
@@ -276,6 +283,198 @@ namespace web.Repositories.Documents
                 ContentType = document.File.ContentType,
                 OriginalFileName = document.File.OriginalFileName
             };
+        }
+
+        /// <summary>
+        /// Extracts the document's text, and — unless it's already written in <paramref name="preferredLanguageCode"/> —
+        /// translates it there and formats it as Markdown, rendered to sanitized HTML for the preview modal.
+        /// Results are cached per (document, language): documents are immutable once uploaded, so a document
+        /// only ever goes through extraction + translation once per language.
+        /// </summary>
+        public async Task<TranslateDocumentResponseDto> TranslateDocumentAsync(int documentId, string preferredLanguageCode, CancellationToken ct = default)
+        {
+            var document = await _context.Documents
+                .AsNoTracking()
+                .Include(d => d.File)
+                .FirstOrDefaultAsync(d => d.Id == documentId, ct);
+
+            if (document?.File is null)
+                return new TranslateDocumentResponseDto { Success = false, ErrorMessage = "Dokumentet findes ikke." };
+
+            var contentType = document.File.ContentType;
+            if (!DocumentLimits.CanExtractText(contentType))
+                return new TranslateDocumentResponseDto { Success = false, ErrorMessage = "Oversættelse understøttes ikke for denne filtype." };
+
+            var fullPath = Path.Combine(_env.ContentRootPath, document.File.StoredPath);
+            if (!File.Exists(fullPath))
+                return new TranslateDocumentResponseDto { Success = false, ErrorMessage = "Filen kunne ikke findes på serveren." };
+
+            var targetLanguageCode = AppLanguages.Normalize(preferredLanguageCode);
+            var targetNative = AppLanguages.GetNativeName(targetLanguageCode);
+
+            var cached = await _context.DocumentTranslations
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.DocumentId == documentId && t.LanguageCode == targetLanguageCode, ct);
+            if (cached is not null)
+            {
+                return new TranslateDocumentResponseDto
+                {
+                    Success = true,
+                    Html = MarkdownRenderer.ToSafeHtml(cached.TranslatedMarkdown),
+                    TargetLanguageName = targetNative
+                };
+            }
+
+            string extracted;
+            try
+            {
+                extracted = DocumentMarkdownExtractor.Extract(fullPath, contentType);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to extract text from document {DocumentId}", documentId);
+                return new TranslateDocumentResponseDto { Success = false, ErrorMessage = "Kunne ikke læse indholdet af dokumentet." };
+            }
+
+            if (string.IsNullOrWhiteSpace(extracted))
+                return new TranslateDocumentResponseDto { Success = false, ErrorMessage = "Der blev ikke fundet nogen tekst i dokumentet." };
+
+            var truncated = false;
+            if (extracted.Length > DocumentLimits.MaxTranslatableChars)
+            {
+                extracted = extracted[..DocumentLimits.MaxTranslatableChars];
+                truncated = true;
+            }
+
+            string? sourceLanguageCode;
+            try
+            {
+                sourceLanguageCode = await _language.DetectLanguageCodeAsync(extracted, cancellationToken: ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Language detection failed for document {DocumentId}", documentId);
+                sourceLanguageCode = null;
+            }
+
+            if (sourceLanguageCode is not null && string.Equals(sourceLanguageCode, targetLanguageCode, StringComparison.OrdinalIgnoreCase))
+            {
+                return new TranslateDocumentResponseDto
+                {
+                    Success = true,
+                    AlreadyInTargetLanguage = true,
+                    TargetLanguageName = targetNative
+                };
+            }
+
+            string markdown;
+            try
+            {
+                var sourceNative = sourceLanguageCode is not null ? AppLanguages.GetNativeName(sourceLanguageCode) : null;
+
+                // Translated in chunks, not as one giant prompt — a whole long document easily exceeds
+                // the model's context window, and Ollama just stops generating silently when that
+                // happens (no error), which is what previously showed up as only the first third or so
+                // of a document getting translated. Each chunk is small enough to always complete.
+                var chunks = SplitIntoChunks(extracted, DocumentLimits.TranslationChunkChars);
+                var translatedChunks = new List<string>(chunks.Count);
+                foreach (var chunk in chunks)
+                {
+                    // A "thinking" model can occasionally burn its whole response on hidden reasoning and
+                    // never reach the actual answer (see LanguageTools.TranslateDocumentToMarkdownAsync) -
+                    // that shows up here as an empty result. One retry clears most of these; if it comes
+                    // back empty twice in a row, treat it as a real failure rather than looping forever.
+                    var translatedChunk = await _language.TranslateDocumentToMarkdownAsync(chunk, targetNative, sourceNative, cancellationToken: ct);
+                    if (string.IsNullOrWhiteSpace(translatedChunk))
+                    {
+                        _logger.LogWarning(
+                            "Document translation returned an empty chunk for document {DocumentId} ({ChunkIndex}/{ChunkCount}) - retrying once",
+                            documentId, translatedChunks.Count + 1, chunks.Count);
+                        translatedChunk = await _language.TranslateDocumentToMarkdownAsync(chunk, targetNative, sourceNative, cancellationToken: ct);
+                    }
+
+                    if (string.IsNullOrWhiteSpace(translatedChunk))
+                    {
+                        _logger.LogWarning(
+                            "Document translation returned an empty chunk twice for document {DocumentId} ({ChunkIndex}/{ChunkCount}), giving up",
+                            documentId, translatedChunks.Count + 1, chunks.Count);
+                        return new TranslateDocumentResponseDto { Success = false, ErrorMessage = "Oversættelsen mislykkedes. Prøv igen senere." };
+                    }
+                    translatedChunks.Add(translatedChunk);
+                }
+                markdown = string.Join("\n\n", translatedChunks);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Document translation failed for document {DocumentId}", documentId);
+                return new TranslateDocumentResponseDto { Success = false, ErrorMessage = "Oversættelsen mislykkedes. Prøv igen senere." };
+            }
+
+            if (string.IsNullOrWhiteSpace(markdown))
+                return new TranslateDocumentResponseDto { Success = false, ErrorMessage = "Oversættelsen mislykkedes. Prøv igen senere." };
+
+            var entity = new DocumentTranslation
+            {
+                DocumentId = documentId,
+                LanguageCode = targetLanguageCode,
+                TranslatedMarkdown = markdown,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            _context.DocumentTranslations.Add(entity);
+            try
+            {
+                await _context.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException ex)
+            {
+                // Same race as FeedService's translation caching: two concurrent translate-clicks for the
+                // same (document, language) can both miss the cache and both try to insert — the unique
+                // index rejects the second insert. This request still returns its own freshly translated
+                // markdown to its caller, it just doesn't also win the race to cache it.
+                _context.Entry(entity).State = EntityState.Detached;
+                _logger.LogDebug(ex, "Document translation cache write skipped for document {DocumentId}/{Language} (likely already cached by a concurrent request)", documentId, targetLanguageCode);
+            }
+
+            _logger.LogInformation("Document {DocumentId} translated to {Language}", documentId, targetLanguageCode);
+            return new TranslateDocumentResponseDto
+            {
+                Success = true,
+                Html = MarkdownRenderer.ToSafeHtml(markdown),
+                TargetLanguageName = targetNative,
+                Truncated = truncated
+            };
+        }
+
+        /// <summary>
+        /// Splits <paramref name="text"/> into chunks of roughly <paramref name="targetChunkChars"/>
+        /// characters, breaking only between blank-line-separated blocks (paragraphs, or a whole Markdown
+        /// table emitted by DocumentMarkdownExtractor) — never inside one, so a table's header/separator/
+        /// rows always stay together in the same translation call. A single block larger than the target
+        /// is kept whole rather than corrupted.
+        /// </summary>
+        private static List<string> SplitIntoChunks(string text, int targetChunkChars)
+        {
+            var blocks = System.Text.RegularExpressions.Regex.Split(text.Trim(), @"\n\s*\n")
+                .Where(b => !string.IsNullOrWhiteSpace(b))
+                .ToList();
+
+            var chunks = new List<string>();
+            var current = new System.Text.StringBuilder();
+
+            foreach (var block in blocks)
+            {
+                if (current.Length > 0 && current.Length + block.Length + 2 > targetChunkChars)
+                {
+                    chunks.Add(current.ToString());
+                    current.Clear();
+                }
+
+                if (current.Length > 0) current.Append("\n\n");
+                current.Append(block);
+            }
+
+            if (current.Length > 0) chunks.Add(current.ToString());
+            return chunks.Count > 0 ? chunks : new List<string> { text };
         }
 
         private async Task<Dictionary<string, string>> LoadDisplayNamesAsync(List<string> userIds, CancellationToken ct)

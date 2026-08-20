@@ -38,6 +38,7 @@ namespace web.Data
         // Documents: folder-like groups of uploaded files
         public DbSet<DocumentGroup> DocumentGroups { get; set; } = null!;
         public DbSet<Document> Documents { get; set; } = null!;
+        public DbSet<DocumentTranslation> DocumentTranslations { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -384,6 +385,29 @@ namespace web.Data
                     .OnDelete(DeleteBehavior.Restrict);
 
                 entity.HasIndex(e => new { e.GroupId, e.CreatedAtUtc });
+            });
+
+            // Configure DocumentTranslation
+            builder.Entity<DocumentTranslation>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.LanguageCode)
+                    .IsRequired()
+                    .HasMaxLength(10);
+
+                entity.Property(e => e.TranslatedMarkdown)
+                    .IsRequired();
+
+                entity.Property(e => e.CreatedAtUtc)
+                    .IsRequired();
+
+                entity.HasOne(e => e.Document)
+                    .WithMany(d => d.Translations)
+                    .HasForeignKey(e => e.DocumentId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(e => new { e.DocumentId, e.LanguageCode }).IsUnique();
             });
         }
     }

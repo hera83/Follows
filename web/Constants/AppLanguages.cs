@@ -61,5 +61,54 @@ namespace web.Constants
 
         /// <summary>Native (autonym) display name for a language code, e.g. "da" -&gt; "Dansk". Normalizes first.</summary>
         public static string GetNativeName(string? code) => All.First(l => l.Code == Normalize(code)).NativeName;
+
+        // Maps the Danish language names LanguageTools.DetectLanguageAsync can answer with back to
+        // codes above. A few common alternate spellings are included since the model isn't always
+        // perfectly consistent (e.g. "Farsi" vs. "Persisk").
+        private static readonly Dictionary<string, string> DanishNameToCode = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Dansk"] = "da",
+            ["Engelsk"] = "en",
+            ["Kinesisk"] = "zh", ["Mandarin"] = "zh",
+            ["Hindi"] = "hi",
+            ["Spansk"] = "es",
+            ["Fransk"] = "fr",
+            ["Arabisk"] = "ar",
+            ["Bengalsk"] = "bn",
+            ["Portugisisk"] = "pt",
+            ["Russisk"] = "ru",
+            ["Urdu"] = "ur",
+            ["Indonesisk"] = "id",
+            ["Tysk"] = "de",
+            ["Japansk"] = "ja",
+            ["Marathi"] = "mr",
+            ["Telugu"] = "te",
+            ["Tyrkisk"] = "tr",
+            ["Tamil"] = "ta",
+            ["Vietnamesisk"] = "vi",
+            ["Koreansk"] = "ko",
+            ["Italiensk"] = "it",
+            ["Thai"] = "th", ["Thailandsk"] = "th",
+            ["Persisk"] = "fa", ["Farsi"] = "fa",
+            ["Swahili"] = "sw",
+            ["Polsk"] = "pl",
+            ["Ukrainsk"] = "uk",
+            ["Nederlandsk"] = "nl", ["Hollandsk"] = "nl",
+            ["Græsk"] = "el",
+            ["Svensk"] = "sv",
+            ["Norsk"] = "no",
+            ["Finsk"] = "fi",
+            ["Islandsk"] = "is"
+        };
+
+        /// <summary>
+        /// Maps a Danish language name (as returned by LanguageTools.DetectLanguageAsync, e.g. "Engelsk")
+        /// back to its code (e.g. "en"). Returns null if the name isn't recognized.
+        /// </summary>
+        public static string? CodeFromDanishName(string? danishName)
+        {
+            if (string.IsNullOrWhiteSpace(danishName)) return null;
+            return DanishNameToCode.TryGetValue(danishName.Trim(), out var code) ? code : null;
+        }
     }
 }

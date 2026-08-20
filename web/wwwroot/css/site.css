@@ -2032,3 +2032,60 @@ p.feed-translated { padding: .5rem .75rem; }
   overflow: auto;
 }
 
+/* Oversat dokument, gengivet fra Markdown (se Documents/Group.cshtml's "Oversæt"-knap) */
+.doc-preview-markdown {
+  width: 100%;
+  padding: 1.25rem 1.5rem;
+  max-height: 70vh;
+  overflow: auto;
+  color: var(--clr-text);
+  font-size: .9rem;
+  line-height: 1.6;
+}
+.doc-preview-markdown h1, .doc-preview-markdown h2, .doc-preview-markdown h3,
+.doc-preview-markdown h4, .doc-preview-markdown h5, .doc-preview-markdown h6 {
+  color: var(--clr-text);
+  font-weight: 700;
+  margin: 1.25rem 0 .5rem;
+}
+.doc-preview-markdown h1:first-child, .doc-preview-markdown h2:first-child, .doc-preview-markdown h3:first-child { margin-top: 0; }
+.doc-preview-markdown p { margin: 0 0 .75rem; }
+.doc-preview-markdown ul, .doc-preview-markdown ol { margin: 0 0 .75rem; padding-left: 1.5rem; }
+.doc-preview-markdown li { margin-bottom: .25rem; }
+.doc-preview-markdown a { color: var(--clr-brand); }
+.doc-preview-markdown blockquote {
+  margin: 0 0 .75rem;
+  padding: .5rem 1rem;
+  border-left: 3px solid var(--clr-border-hover);
+  color: var(--clr-text-muted);
+}
+.doc-preview-markdown code {
+  background: var(--clr-bg);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-sm);
+  padding: .1rem .35rem;
+  font-size: .85em;
+}
+.doc-preview-markdown pre {
+  background: var(--clr-bg);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-md);
+  padding: .75rem 1rem;
+  overflow-x: auto;
+  margin: 0 0 .75rem;
+}
+.doc-preview-markdown pre code { background: none; border: none; padding: 0; }
+.doc-preview-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1rem;
+  font-size: .85em;
+}
+.doc-preview-markdown th, .doc-preview-markdown td {
+  border: 1px solid var(--clr-border);
+  padding: .45rem .65rem;
+  text-align: left;
+}
+.doc-preview-markdown th { background: var(--clr-bg); font-weight: 700; }
+.doc-preview-markdown hr { border: none; border-top: 1px solid var(--clr-border); margin: 1rem 0; }
+

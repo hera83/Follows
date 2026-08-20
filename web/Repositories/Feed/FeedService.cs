@@ -760,10 +760,7 @@ namespace web.Repositories.Feed
 
             try
             {
-                var detectedName = await _language.DetectLanguageAsync(text, cancellationToken: ct);
-                if (string.IsNullOrWhiteSpace(detectedName)) return null;
-
-                return DanishLanguageNameToCode.TryGetValue(detectedName.Trim(), out var code) ? code : null;
+                return await _language.DetectLanguageCodeAsync(text, cancellationToken: ct);
             }
             catch (Exception ex)
             {
@@ -771,44 +768,5 @@ namespace web.Repositories.Feed
                 return null;
             }
         }
-
-        // Maps the Danish language names LanguageTools.DetectLanguageAsync can answer with back to
-        // web.Constants.AppLanguages codes. A few common alternate spellings are included since the
-        // model isn't always perfectly consistent (e.g. "Farsi" vs. "Persisk").
-        private static readonly Dictionary<string, string> DanishLanguageNameToCode = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["Dansk"] = "da",
-            ["Engelsk"] = "en",
-            ["Kinesisk"] = "zh", ["Mandarin"] = "zh",
-            ["Hindi"] = "hi",
-            ["Spansk"] = "es",
-            ["Fransk"] = "fr",
-            ["Arabisk"] = "ar",
-            ["Bengalsk"] = "bn",
-            ["Portugisisk"] = "pt",
-            ["Russisk"] = "ru",
-            ["Urdu"] = "ur",
-            ["Indonesisk"] = "id",
-            ["Tysk"] = "de",
-            ["Japansk"] = "ja",
-            ["Marathi"] = "mr",
-            ["Telugu"] = "te",
-            ["Tyrkisk"] = "tr",
-            ["Tamil"] = "ta",
-            ["Vietnamesisk"] = "vi",
-            ["Koreansk"] = "ko",
-            ["Italiensk"] = "it",
-            ["Thai"] = "th", ["Thailandsk"] = "th",
-            ["Persisk"] = "fa", ["Farsi"] = "fa",
-            ["Swahili"] = "sw",
-            ["Polsk"] = "pl",
-            ["Ukrainsk"] = "uk",
-            ["Nederlandsk"] = "nl", ["Hollandsk"] = "nl",
-            ["Græsk"] = "el",
-            ["Svensk"] = "sv",
-            ["Norsk"] = "no",
-            ["Finsk"] = "fi",
-            ["Islandsk"] = "is"
-        };
     }
 }

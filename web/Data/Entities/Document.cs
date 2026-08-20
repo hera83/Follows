@@ -22,5 +22,8 @@ namespace web.Data.Entities
         public string UploadedByUserId { get; set; } = string.Empty;
 
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+
+        /// <summary>Cached translations of the document's extracted text, one row per language it's been translated into.</summary>
+        public virtual ICollection<DocumentTranslation> Translations { get; set; } = new List<DocumentTranslation>();
     }
 }

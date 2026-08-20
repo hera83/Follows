@@ -151,6 +151,10 @@
             </div>
             <div class="modal-body doc-preview-body" id="documentPreviewBody"></div>
             <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="documentTranslateBtn" title="Oversæt til dit foretrukne sprog">
+                    <span class="spinner-border spinner-border-sm me-1 d-none" data-translate-spinner></span>
+                    <i class="bi bi-translate me-1" data-translate-icon></i>Oversæt
+                </button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Luk</button>
                 <a class="btn btn-primary" id="documentPreviewDownload" download><i class="bi bi-download me-1"></i>Download</a>
             </div>
@@ -232,6 +236,10 @@
             const previewTitle = document.getElementById('documentPreviewTitle');
             const previewIcon = document.getElementById('documentPreviewIcon');
             const previewDownload = document.getElementById('documentPreviewDownload');
+            const translateBtn = document.getElementById('documentTranslateBtn');
+            const translateSpinner = translateBtn?.querySelector('[data-translate-spinner]');
+            const translateIcon = translateBtn?.querySelector('[data-translate-icon]');
+            let currentPreviewDocId = null;
 
             previewModal?.addEventListener('show.bs.modal', async (event) => {
                 const btn = event.relatedTarget;
@@ -242,6 +250,9 @@
                 const contentType = btn.dataset.contentType;
                 const canPreview = btn.dataset.canPreview === 'true';
                 const viewUrl = `@Url.Action("View")/${id}`;
+
+                currentPreviewDocId = id;
+                translateBtn?.classList.toggle('d-none', btn.dataset.canTranslate !== 'true');
 
                 previewTitle.textContent = title;
                 previewIcon.className = `bi ${btn.dataset.icon || 'bi-file-earmark'} me-2`;
@@ -278,6 +289,67 @@
 
             previewModal?.addEventListener('hidden.bs.modal', () => {
                 previewBody.innerHTML = ''; // stopper evt. iframe-indlæsning
+                translateBtn?.classList.remove('d-none');
+            });
+
+            translateBtn?.addEventListener('click', async () => {
+                if (!currentPreviewDocId) return;
+
+                const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+                translateBtn.disabled = true;
+                translateSpinner?.classList.remove('d-none');
+                translateIcon?.classList.add('d-none');
+                translateBtn.title = 'Oversætter... kan tage et par minutter for store dokumenter';
+
+                // Uden denne timeout hænger knappen for evigt med en spinner og ingen forklaring, hvis
+                // AiGatewayen er langsom, utilgængelig eller fejlkonfigureret — der er intet at fange og
+                // vise, fetch() venter bare i det uendelige. Store dokumenter oversættes chunk for chunk
+                // server-side (se DocumentsService.TranslateDocumentAsync), i én sammenhængende request,
+                // så loftet her skal række til flere chunks i træk på en langsom model - 20 minutter er
+                // rigeligt i normale tilfælde, men stadig et loft, så en reelt hængende request en dag
+                // bliver synlig i stedet for evigt tavs.
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 20 * 60 * 1000);
+
+                try {
+                    const formData = new FormData();
+                    if (token) formData.append('__RequestVerificationToken', token);
+
+                    const res = await fetch(`@Url.Action("Translate")/${currentPreviewDocId}`, {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'X-Requested-With': 'fetch' },
+                        signal: controller.signal
+                    });
+                    const data = await res.json();
+
+                    if (!data.success) {
+                        FvToast.show(data.type || 'error', data.message || 'Oversættelsen mislykkedes.');
+                        return;
+                    }
+
+                    if (data.alreadyInTargetLanguage) {
+                        FvToast.show('info', `Dokumentet er allerede på ${data.targetLanguageName}.`);
+                        return;
+                    }
+
+                    // Fjern den oprindelige forhåndsvisning (PDF-reader/billede/tekst) og vis den oversatte Markdown i stedet.
+                    previewBody.innerHTML = `<div class="doc-preview-markdown">${data.html}</div>`;
+
+                    if (data.truncated) {
+                        FvToast.show('warning', 'Dokumentet var langt og blev afkortet før oversættelse — enkelte afsnit mangler muligvis.');
+                    }
+                } catch (err) {
+                    FvToast.show('error', err?.name === 'AbortError'
+                        ? 'Oversættelsen tog for lang tid og blev afbrudt. Tjek at AI Gateway er tilgængelig under Indstillinger.'
+                        : 'Netværksfejl. Prøv igen.');
+                } finally {
+                    clearTimeout(timeoutId);
+                    translateBtn.disabled = false;
+                    translateSpinner?.classList.add('d-none');
+                    translateIcon?.classList.remove('d-none');
+                    translateBtn.title = 'Oversæt til dit foretrukne sprog';
+                }
             });
         })();
     </script>

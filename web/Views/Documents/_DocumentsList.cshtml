@@ -30,7 +30,7 @@ else
                         <td>
                             <i class="bi @iconClass me-2"></i><button type="button" class="btn btn-link p-0 align-baseline doc-title-link" data-bs-toggle="modal" data-bs-target="#documentPreviewModal"
                                     data-id="@doc.Id" data-title="@doc.Title" data-content-type="@doc.ContentType"
-                                    data-can-preview="@doc.CanPreviewInline.ToString().ToLower()" data-icon="@iconClass"
+                                    data-can-preview="@doc.CanPreviewInline.ToString().ToLower()" data-can-translate="@doc.CanTranslate.ToString().ToLower()" data-icon="@iconClass"
                                     title="Vis" aria-label="Vis @doc.Title">@doc.Title</button>
                         </td>
                         <td>@doc.UploadedByDisplayName</td>
@@ -40,7 +40,7 @@ else
                             <div class="d-inline-flex gap-1">
                                 <button type="button" class="btn btn-sm btn-secondary btn-icon" data-bs-toggle="modal" data-bs-target="#documentPreviewModal"
                                         data-id="@doc.Id" data-title="@doc.Title" data-content-type="@doc.ContentType"
-                                        data-can-preview="@doc.CanPreviewInline.ToString().ToLower()" data-icon="@iconClass"
+                                        data-can-preview="@doc.CanPreviewInline.ToString().ToLower()" data-can-translate="@doc.CanTranslate.ToString().ToLower()" data-icon="@iconClass"
                                         title="Vis" aria-label="Vis">
                                     <i class="bi bi-eye"></i>
                                 </button>

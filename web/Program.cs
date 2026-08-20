@@ -43,7 +43,13 @@ try
             sqliteDbPath: logDatabasePath,
             restrictedToMinimumLevel: LogEventLevel.Information,
             storeTimestampInUtc: true,
-            rollOver: false)
+            rollOver: false,
+            // The sink caps the database file at 10 MB by default (via SQLite's max_page_count) and
+            // then throws "database or disk is full" on every insert once that's reached — nothing to
+            // do with actual free disk space. rollOver stays false (LogReaderService always reads this
+            // one fixed logs.db path for the Settings → Logs tab), so the cap needs to be generous
+            // instead: 500 MB comfortably covers this app's log volume for a long time.
+            maxDatabaseSize: 500)
         .CreateLogger();
 
     Log.Information("Starting web application");

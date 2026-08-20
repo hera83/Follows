@@ -230,6 +230,32 @@ namespace web.Controllers
             return PhysicalFile(file.FullPath, file.ContentType, file.OriginalFileName, enableRangeProcessing: true);
         }
 
+        /// <summary>
+        /// Extracts the document's text and translates it to the caller's preferred language (from their
+        /// profile), formatted as Markdown and rendered to HTML — consumed by the preview modal's
+        /// "Oversæt"-button. Returns success:false with a toast-style message on failure.
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Translate(int id)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user is null) return Unauthorized();
+
+            var result = await _documentsService.TranslateDocumentAsync(id, user.PreferredLanguage, HttpContext.RequestAborted);
+            if (!result.Success)
+                return this.ToastErrorJson(result.ErrorMessage ?? "Oversættelsen mislykkedes.");
+
+            return Json(new
+            {
+                success = true,
+                alreadyInTargetLanguage = result.AlreadyInTargetLanguage,
+                targetLanguageName = result.TargetLanguageName,
+                html = result.Html,
+                truncated = result.Truncated
+            });
+        }
+
         private bool IsModerator() =>
             User.IsInRole(AppRoles.Administrator) || User.IsInRole(AppRoles.Developer);
 
@@ -258,6 +284,7 @@ namespace web.Controllers
                 UploadedByDisplayName = d.UploadedByDisplayName,
                 CreatedAtUtc = d.CreatedAtUtc,
                 CanPreviewInline = d.CanPreviewInline,
+                CanTranslate = d.CanTranslate,
                 CanDelete = d.CanDelete
             }).ToList()
         };

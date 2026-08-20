@@ -19,5 +19,7 @@ namespace web.Repositories.Documents.Interfaces
         Task<DeleteDocumentResponseDto> DeleteDocumentAsync(int documentId, string requestingUserId, bool isModerator, CancellationToken ct = default);
 
         Task<DocumentFileDto?> GetDocumentFileAsync(int documentId, CancellationToken ct = default);
+
+        Task<TranslateDocumentResponseDto> TranslateDocumentAsync(int documentId, string preferredLanguageCode, CancellationToken ct = default);
     }
 }
