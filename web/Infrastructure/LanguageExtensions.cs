@@ -99,7 +99,15 @@ namespace web.Infrastructure
             // "think: false"-mulighed at sende videre til Ollama (se dens swagger: ChatRequestDto har
             // ingen think-felt og additionalProperties: false), så der er ingen API-vej til at slå det
             // fra herfra - kun den eksplicitte instruks ovenfor i systemPrompt om at svare direkte.
-            var options = new OllamaOptionsDto { Temperature = 0.2, NumCtx = 16384, NumPredict = -1 };
+            //
+            // 4096 (ikke modellens fulde 32k-vindue) - sat lavt med vilje. KV-cachen Ollama skal allokere
+            // til selve kontekstvinduet vokser lineært med num_ctx, oveni modelvægtene selv (~7-9 GB for en
+            // kvantiseret 12B-model) - på et 16 GB V100-kort levnede 16384 for lidt VRAM til at holde
+            // stabilt loaded, hvilket i praksis viste sig som skiftevis "connection refused" (Ollama crasher/
+            // genstarter på OOM) og flere-minutter-lange hæng (CPU-offload når GPU'en løber tør). Et enkelt
+            // chunk her er DocumentLimits.TranslationChunkChars (~900 tegn, ~250-300 tokens) plus system-
+            // prompt og det oversatte Markdown-svar - 4096 giver rigelig margin til det uden at presse VRAM.
+            var options = new OllamaOptionsDto { Temperature = 0.2, NumCtx = 4096, NumPredict = -1 };
 
             return CompleteAsync(systemPrompt, content, model, options, cancellationToken);
         }
