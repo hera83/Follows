@@ -383,7 +383,11 @@
                         data = await statusRes.json();
 
                         if (data.status === 'running') {
-                            const label = data.total > 0 ? `Oversætter... ${data.completed} af ${data.total}` : 'Oversætter...';
+                            // AiGatewayen håndterer kun én oversættelse ad gangen (se DocumentTranslationJobTracker)
+                            // — "queued" betyder et andet dokument er ved at blive oversat lige nu, ikke at noget hænger.
+                            const label = data.queued
+                                ? 'I kø... venter på en anden oversættelse'
+                                : (data.total > 0 ? `Oversætter... ${data.completed} af ${data.total}` : 'Oversætter...');
                             if (translateLabel) translateLabel.textContent = label;
                             translateBtn.title = label;
                             continue;

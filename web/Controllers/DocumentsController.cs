@@ -261,36 +261,67 @@ namespace web.Controllers
             var user = await _userManager.GetUserAsync(User);
             if (user is null) return Unauthorized();
 
-            var jobId = _translationJobs.Start(user.Id);
+            // Reuse an already-running job for this document instead of spinning up a second one that
+            // would just queue behind it for TranslationSlot — see DocumentTranslationJobTracker for why.
+            var jobId = _translationJobs.TryStart(user.Id, id, out var isNew);
+            if (!isNew) return Json(new { jobId });
+
             var preferredLanguage = user.PreferredLanguage;
 
             _ = Task.Run(async () =>
             {
                 using var scope = _scopeFactory.CreateScope();
                 var documentsService = scope.ServiceProvider.GetRequiredService<IDocumentsService>();
+
+                // Hard upper bound so a stuck/very slow AI Gateway call eventually releases TranslationSlot
+                // instead of blocking every other document translation behind it forever — a background job
+                // otherwise has nothing else that would ever cancel it (see DocumentTranslationJobTracker).
+                using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(DocumentLimits.TranslationJobTimeoutMinutes));
                 try
                 {
-                    var result = await documentsService.TranslateDocumentAsync(
-                        id,
-                        preferredLanguage,
-                        force,
-                        onChunkCountKnown: total => _translationJobs.ReportChunkCount(jobId, total),
-                        onProgress: completed => _translationJobs.ReportProgress(jobId, completed));
-
-                    if (!result.Success)
+                    // AiGatewayen kan kun håndtere ét oversættelses-kald ad gangen, så al ventetid på
+                    // TranslationSlot foregår her, før selve oversættelsen overhovedet starter - Queued i
+                    // TranslateStatus afspejler præcis dette, så UI'en kan vise "i kø" i stedet for et
+                    // fastfrosset "0 af N" mens et andet dokument bliver færdigt.
+                    await _translationJobs.TranslationSlot.WaitAsync(cts.Token);
+                    try
                     {
-                        _translationJobs.Fail(jobId, result.ErrorMessage ?? "Oversættelsen mislykkedes.");
-                        return;
+                        _translationJobs.MarkStarted(jobId);
+
+                        var result = await documentsService.TranslateDocumentAsync(
+                            id,
+                            preferredLanguage,
+                            force,
+                            onChunkCountKnown: total => _translationJobs.ReportChunkCount(jobId, total),
+                            onProgress: completed => _translationJobs.ReportProgress(jobId, completed),
+                            ct: cts.Token);
+
+                        if (!result.Success)
+                        {
+                            _translationJobs.Fail(jobId, result.ErrorMessage ?? "Oversættelsen mislykkedes.");
+                            return;
+                        }
+
+                        _translationJobs.Complete(jobId, job =>
+                        {
+                            job.Success = true;
+                            job.AlreadyInTargetLanguage = result.AlreadyInTargetLanguage;
+                            job.TargetLanguageName = result.TargetLanguageName;
+                            job.Html = result.Html;
+                            job.Truncated = result.Truncated;
+                        });
                     }
-
-                    _translationJobs.Complete(jobId, job =>
+                    finally
                     {
-                        job.Success = true;
-                        job.AlreadyInTargetLanguage = result.AlreadyInTargetLanguage;
-                        job.TargetLanguageName = result.TargetLanguageName;
-                        job.Html = result.Html;
-                        job.Truncated = result.Truncated;
-                    });
+                        _translationJobs.TranslationSlot.Release();
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogWarning(
+                        "Document translation job {JobId} for document {DocumentId} timed out after {Minutes} minutes",
+                        jobId, id, DocumentLimits.TranslationJobTimeoutMinutes);
+                    _translationJobs.Fail(jobId, "Oversættelsen tog for lang tid og blev afbrudt. Prøv igen senere.");
                 }
                 catch (Exception ex)
                 {
@@ -316,7 +347,7 @@ namespace web.Controllers
             if (job is null) return NotFound();
 
             if (job.Status == DocumentTranslationJobStatus.Running)
-                return Json(new { status = "running", completed = job.CompletedChunks, total = job.TotalChunks });
+                return Json(new { status = "running", queued = job.Queued, completed = job.CompletedChunks, total = job.TotalChunks });
 
             // Terminal state - the client has (or is about to) read the result, no reason to keep it around.
             _translationJobs.Remove(jobId);

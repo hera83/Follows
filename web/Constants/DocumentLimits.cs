@@ -68,6 +68,15 @@ namespace web.Constants
         /// </summary>
         public const int TranslationChunkChars = 900;
 
+        /// <summary>
+        /// Hard upper bound on how long one background translation job (see DocumentTranslationJobTracker)
+        /// is allowed to run before it's cancelled and marked failed. Without this, a genuinely stuck AI
+        /// Gateway call would hold TranslationSlot forever and silently block every other document
+        /// translation behind it — since nothing else ever cancels a background job (it deliberately keeps
+        /// running even if the browser that started it closes, so the result still gets cached).
+        /// </summary>
+        public const int TranslationJobTimeoutMinutes = 15;
+
         /// <summary>Bootstrap Icons class for a document row, chosen from its content type.</summary>
         public static string IconClassFor(string contentType) => contentType switch
         {
