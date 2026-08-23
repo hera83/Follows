@@ -329,6 +329,17 @@
                 translateBtn?.classList.remove('d-none');
             });
 
+            // Pause mellem hvert statustjek mens en oversættelse kører i baggrunden (se TranslateStart/
+            // TranslateStatus) — hyppig nok til at "X af Y"-tallet føles levende, sjælden nok til ikke at
+            // spamme serveren under et dokument med mange chunks.
+            const TRANSLATE_POLL_MS = 1000;
+            // Loft på hvor længe der polles, før vi giver op og viser en fejl i stedet for at blive ved i
+            // det uendelige — selve oversættelsen kører videre i baggrunden uanset (og bliver cachet), så
+            // et nyt tryk på "Oversæt" bagefter rammer typisk cachen med det samme.
+            const TRANSLATE_POLL_TIMEOUT_MS = 20 * 60 * 1000;
+
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
             translateBtn?.addEventListener('click', async () => {
                 if (!currentPreviewDocId) return;
 
@@ -336,17 +347,8 @@
                 translateBtn.disabled = true;
                 translateSpinner?.classList.remove('d-none');
                 translateIcon?.classList.add('d-none');
-                translateBtn.title = 'Oversætter... kan tage et par minutter for store dokumenter';
-
-                // Uden denne timeout hænger knappen for evigt med en spinner og ingen forklaring, hvis
-                // AiGatewayen er langsom, utilgængelig eller fejlkonfigureret — der er intet at fange og
-                // vise, fetch() venter bare i det uendelige. Store dokumenter oversættes chunk for chunk
-                // server-side (se DocumentsService.TranslateDocumentAsync), i én sammenhængende request,
-                // så loftet her skal række til flere chunks i træk på en langsom model - 20 minutter er
-                // rigeligt i normale tilfælde, men stadig et loft, så en reelt hængende request en dag
-                // bliver synlig i stedet for evigt tavs.
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 20 * 60 * 1000);
+                translateBtn.title = 'Oversætter...';
+                if (translateLabel) translateLabel.textContent = 'Oversætter...';
 
                 const wasRetry = hasTranslatedResult;
 
@@ -355,16 +357,47 @@
                     if (token) formData.append('__RequestVerificationToken', token);
                     if (wasRetry) formData.append('force', 'true'); // spring den gemte oversættelse over, oversæt igen fra bunden
 
-                    const res = await fetch(`@Url.Action("Translate")/${currentPreviewDocId}`, {
+                    const startRes = await fetch(`@Url.Action("TranslateStart")/${currentPreviewDocId}`, {
                         method: 'POST',
                         body: formData,
-                        headers: { 'X-Requested-With': 'fetch' },
-                        signal: controller.signal
+                        headers: { 'X-Requested-With': 'fetch' }
                     });
-                    const data = await res.json();
+                    const startData = await startRes.json();
+                    if (!startRes.ok || !startData.jobId) {
+                        FvToast.show(startData.type || 'error', startData.message || 'Oversættelsen kunne ikke startes.');
+                        return;
+                    }
 
-                    if (!data.success) {
-                        FvToast.show(data.type || 'error', data.message || 'Oversættelsen mislykkedes.');
+                    const deadline = Date.now() + TRANSLATE_POLL_TIMEOUT_MS;
+                    let data = null;
+                    while (Date.now() < deadline) {
+                        await sleep(TRANSLATE_POLL_MS);
+
+                        const statusRes = await fetch(`@Url.Action("TranslateStatus")?jobId=${encodeURIComponent(startData.jobId)}`, {
+                            headers: { 'X-Requested-With': 'fetch' }
+                        });
+                        if (!statusRes.ok) {
+                            FvToast.show('error', 'Kunne ikke følge oversættelsens status. Prøv igen.');
+                            return;
+                        }
+                        data = await statusRes.json();
+
+                        if (data.status === 'running') {
+                            const label = data.total > 0 ? `Oversætter... ${data.completed} af ${data.total}` : 'Oversætter...';
+                            if (translateLabel) translateLabel.textContent = label;
+                            translateBtn.title = label;
+                            continue;
+                        }
+                        break; // 'completed' eller 'failed'
+                    }
+
+                    if (!data || data.status === 'running') {
+                        FvToast.show('error', 'Oversættelsen tager usædvanligt lang tid. Den fortsætter i baggrunden — prøv "Oversæt" igen om lidt.');
+                        return;
+                    }
+
+                    if (data.status === 'failed') {
+                        FvToast.show('error', data.message || 'Oversættelsen mislykkedes.');
                         return;
                     }
 
@@ -380,12 +413,9 @@
                     if (data.truncated) {
                         FvToast.show('warning', 'Dokumentet var langt og blev afkortet før oversættelse — enkelte afsnit mangler muligvis.');
                     }
-                } catch (err) {
-                    FvToast.show('error', err?.name === 'AbortError'
-                        ? 'Oversættelsen tog for lang tid og blev afbrudt. Tjek at AI Gateway er tilgængelig under Indstillinger.'
-                        : 'Netværksfejl. Prøv igen.');
+                } catch {
+                    FvToast.show('error', 'Netværksfejl. Prøv igen.');
                 } finally {
-                    clearTimeout(timeoutId);
                     translateBtn.disabled = false;
                     translateSpinner?.classList.add('d-none');
                     translateIcon?.classList.remove('d-none');

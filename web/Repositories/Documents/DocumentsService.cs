@@ -294,7 +294,13 @@ namespace web.Repositories.Documents
         /// freshly translated result. Useful when a first attempt came out empty/partial (e.g. from the
         /// model-reasoning issue chunking guards against) and the document is worth simply trying again.
         /// </summary>
-        public async Task<TranslateDocumentResponseDto> TranslateDocumentAsync(int documentId, string preferredLanguageCode, bool force = false, CancellationToken ct = default)
+        public async Task<TranslateDocumentResponseDto> TranslateDocumentAsync(
+            int documentId,
+            string preferredLanguageCode,
+            bool force = false,
+            Action<int>? onChunkCountKnown = null,
+            Action<int>? onProgress = null,
+            CancellationToken ct = default)
         {
             var document = await _context.Documents
                 .AsNoTracking()
@@ -381,6 +387,7 @@ namespace web.Repositories.Documents
                 // happens (no error), which is what previously showed up as only the first third or so
                 // of a document getting translated. Each chunk is small enough to always complete.
                 var chunks = SplitIntoChunks(extracted, DocumentLimits.TranslationChunkChars);
+                onChunkCountKnown?.Invoke(chunks.Count);
                 var translatedChunks = new List<string>(chunks.Count);
                 foreach (var chunk in chunks)
                 {
@@ -405,6 +412,7 @@ namespace web.Repositories.Documents
                         return new TranslateDocumentResponseDto { Success = false, ErrorMessage = "Oversættelsen mislykkedes. Prøv igen senere." };
                     }
                     translatedChunks.Add(translatedChunk);
+                    onProgress?.Invoke(translatedChunks.Count);
                 }
                 markdown = string.Join("\n\n", translatedChunks);
             }

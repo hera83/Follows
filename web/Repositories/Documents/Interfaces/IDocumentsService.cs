@@ -20,6 +20,18 @@ namespace web.Repositories.Documents.Interfaces
 
         Task<DocumentFileDto?> GetDocumentFileAsync(int documentId, CancellationToken ct = default);
 
-        Task<TranslateDocumentResponseDto> TranslateDocumentAsync(int documentId, string preferredLanguageCode, bool force = false, CancellationToken ct = default);
+        /// <param name="onProgress">
+        /// Called once with the total chunk count as soon as the document's text has been extracted and
+        /// split, then again after each chunk finishes translating with the number completed so far. Lets
+        /// a caller running this in the background (see DocumentsController.TranslateStart) report "X af
+        /// Y" progress without changing how chunks are translated (still strictly one at a time).
+        /// </param>
+        Task<TranslateDocumentResponseDto> TranslateDocumentAsync(
+            int documentId,
+            string preferredLanguageCode,
+            bool force = false,
+            Action<int>? onChunkCountKnown = null,
+            Action<int>? onProgress = null,
+            CancellationToken ct = default);
     }
 }

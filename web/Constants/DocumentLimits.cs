@@ -59,8 +59,14 @@ namespace web.Constants
         /// "only the first third got translated". Small chunks leave the model plenty of context headroom
         /// (some models spend a chunk of their budget on hidden reasoning before answering — see
         /// LanguageTools.TranslateDocumentToMarkdownAsync) and translate completely every time.
+        ///
+        /// Deliberately smaller than you might pick for throughput alone: chunks are still translated one
+        /// at a time, never in parallel (the AI Gateway only serves one request at a time), so this number
+        /// also sets the granularity of the "X af Y" progress shown while translating (see
+        /// DocumentTranslationJobTracker) — smaller chunks mean more frequent, visible progress instead of
+        /// long stretches with no feedback, at the cost of a bit more per-chunk request overhead.
         /// </summary>
-        public const int TranslationChunkChars = 1_800;
+        public const int TranslationChunkChars = 900;
 
         /// <summary>Bootstrap Icons class for a document row, chosen from its content type.</summary>
         public static string IconClassFor(string contentType) => contentType switch

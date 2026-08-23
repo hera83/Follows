@@ -128,6 +128,7 @@ try
     builder.Services.AddScoped<IUserProfileService, UserProfileService>();
     builder.Services.AddScoped<IFeedService, FeedService>();
     builder.Services.AddScoped<IDocumentsService, DocumentsService>();
+    builder.Services.AddSingleton<DocumentTranslationJobTracker>();
     builder.Services.AddScoped<IMailService, MailService>();
 
     if (!string.IsNullOrWhiteSpace(builder.Configuration["Sms:ApiKey"]) && !string.IsNullOrWhiteSpace(smsBaseUrl))
