@@ -100,14 +100,19 @@ namespace web.Infrastructure
             // ingen think-felt og additionalProperties: false), så der er ingen API-vej til at slå det
             // fra herfra - kun den eksplicitte instruks ovenfor i systemPrompt om at svare direkte.
             //
-            // 4096 (ikke modellens fulde 32k-vindue) - sat lavt med vilje. KV-cachen Ollama skal allokere
-            // til selve kontekstvinduet vokser lineært med num_ctx, oveni modelvægtene selv (~7-9 GB for en
-            // kvantiseret 12B-model) - på et 16 GB V100-kort levnede 16384 for lidt VRAM til at holde
-            // stabilt loaded, hvilket i praksis viste sig som skiftevis "connection refused" (Ollama crasher/
-            // genstarter på OOM) og flere-minutter-lange hæng (CPU-offload når GPU'en løber tør). Et enkelt
-            // chunk her er DocumentLimits.TranslationChunkChars (~900 tegn, ~250-300 tokens) plus system-
-            // prompt og det oversatte Markdown-svar - 4096 giver rigelig margin til det uden at presse VRAM.
-            var options = new OllamaOptionsDto { Temperature = 0.2, NumCtx = 4096, NumPredict = -1 };
+            // Afvejning mellem to modsatrettede problemer, begge set i praksis på et 16 GB V100-kort med
+            // gemma4:12b:
+            //  - For højt (16384): KV-cachen bliver for stor til at holde modellen stabilt loaded -
+            //    viste sig som skiftevis "connection refused" (Ollama crasher/genstarter på OOM) og
+            //    flere-minutter-lange hæng (CPU-offload når GPU'en løber tør).
+            //  - For lavt (4096): modellen (som ræsonnerer skjult i <think>...</think> før den svarer,
+            //    se CleanResponse nedenfor) bruger det meste af det lille budget på selve ræsonnementet og
+            //    når aldrig frem til et faktisk svar - endte som tomme chunks (se DocumentsService's log
+            //    "returned an empty chunk twice ... giving up") selvom kaldet i sig selv lykkedes fint.
+            // 8192 er et forsøg på en mellemvej - dobbelt hovedrum ift. 4096 til ræsonnement + svar, stadig
+            // langt fra 16384's VRAM-forbrug. Juster videre i den ene eller anden retning ud fra hvad der
+            // reelt sker på serveren (VRAM-forbrug vs. tomme chunks).
+            var options = new OllamaOptionsDto { Temperature = 0.2, NumCtx = 8192, NumPredict = -1 };
 
             return CompleteAsync(systemPrompt, content, model, options, cancellationToken);
         }
