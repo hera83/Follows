@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using web.Constants;
 using web.Data.Entities;
+using web.Infrastructure.UiTranslation;
 
 namespace web.Data.Seed
 {
@@ -41,6 +42,37 @@ namespace web.Data.Seed
 
                 // Seed default themes
                 await SeedDefaultThemesAsync(context, logger);
+
+                // Seed known UI-catalog source strings (see UiTranslationSeedStrings), then top up any
+                // already-installed language in the background - without this, a freshly deployed
+                // environment would have the full "known" count right away (good for the Sprog-tab
+                // overview) but would still show these newly-seeded strings in Danish until someone
+                // happens to trigger a run (Opdater/Tilføj sprog, a login, or the next 5-minute sweep).
+                var newlySeeded = await SeedUiTranslationCatalogAsync(context, logger);
+                if (newlySeeded)
+                {
+                    var scopeFactory = services.GetRequiredService<IServiceScopeFactory>();
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            using var bgScope = scopeFactory.CreateScope();
+                            var db = bgScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                            var bulk = bgScope.ServiceProvider.GetRequiredService<IUiTranslationBulkService>();
+
+                            var installedLanguages = await db.InstalledLanguages
+                                .Select(i => i.LanguageCode)
+                                .ToListAsync();
+
+                            foreach (var language in installedLanguages)
+                                await bulk.RunAsync(language, CancellationToken.None);
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogWarning(ex, "Post-startup UI catalog top-up did not finish cleanly");
+                        }
+                    });
+                }
 
                 logger.LogInformation("Database initialization completed successfully");
             }
@@ -494,6 +526,50 @@ namespace web.Data.Seed
                 await context.SaveChangesAsync();
                 logger.LogInformation("Seeded {Count} missing theme presets", missingPresets.Count);
             }
+        }
+
+        /// <summary>
+        /// Registers every string in UiTranslationSeedStrings into the canonical "da" UiTranslationEntry
+        /// registry, if it isn't there already — see that class for why this exists (keeps a freshly
+        /// deployed environment's "known string" count complete from the first startup, instead of only
+        /// growing organically as real viewers happen to render each page/popup for the first time).
+        /// Returns true if it actually added anything new.
+        /// </summary>
+        private static async Task<bool> SeedUiTranslationCatalogAsync(ApplicationDbContext context, ILogger logger)
+        {
+            var existingHashes = (await context.UiTranslationEntries
+                .Where(e => e.LanguageCode == AppLanguages.Default)
+                .Select(e => e.SourceTextHash)
+                .ToListAsync())
+                .ToHashSet();
+
+            var now = DateTime.UtcNow;
+            var added = 0;
+
+            foreach (var text in UiTranslationSeedStrings.All)
+            {
+                var hash = UiTranslationHasher.Hash(text);
+                if (!existingHashes.Add(hash)) continue;
+
+                context.UiTranslationEntries.Add(new UiTranslationEntry
+                {
+                    SourceTextHash = hash,
+                    SourceText = text,
+                    LanguageCode = AppLanguages.Default,
+                    TranslatedText = text,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now
+                });
+                added++;
+            }
+
+            if (added > 0)
+            {
+                await context.SaveChangesAsync();
+                logger.LogInformation("Seeded {Count} UI-catalog source strings", added);
+            }
+
+            return added > 0;
         }
     }
 }
