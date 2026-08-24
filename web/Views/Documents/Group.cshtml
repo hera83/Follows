@@ -335,8 +335,10 @@
             const TRANSLATE_POLL_MS = 1000;
             // Loft på hvor længe der polles, før vi giver op og viser en fejl i stedet for at blive ved i
             // det uendelige — selve oversættelsen kører videre i baggrunden uanset (og bliver cachet), så
-            // et nyt tryk på "Oversæt" bagefter rammer typisk cachen med det samme.
-            const TRANSLATE_POLL_TIMEOUT_MS = 20 * 60 * 1000;
+            // et nyt tryk på "Oversæt" bagefter rammer typisk cachen med det samme. Holdt over serverens
+            // DocumentLimits.TranslationJobTimeoutMinutes, så det er serveren der først giver op på en
+            // langsom-men-kørende oversættelse, ikke klienten.
+            const TRANSLATE_POLL_TIMEOUT_MS = 30 * 60 * 1000;
 
             const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 

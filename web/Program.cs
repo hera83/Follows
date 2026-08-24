@@ -104,9 +104,17 @@ try
     });
 
     // Add services to the container.
-    builder.Services.AddControllersWithViews();
+    builder.Services.AddMemoryCache();
+    builder.Services.AddControllersWithViews(options =>
+    {
+        // Translates every toast (TempData- and JSON-based alike) to the viewer's profile language in one
+        // central place - see ToastTranslation.cs. Global so it runs for every controller action without
+        // any of them needing to change.
+        options.Filters.Add<ToastTranslationFilter>();
+    });
 
     // Custom services
+    builder.Services.AddScoped<IToastTranslationService, ToastTranslationService>();
     builder.Services.AddScoped<ILogReaderService, LogReaderService>();
     builder.Services.AddHttpClient("Ollama");
     builder.Services.AddSingleton<OllamaHttpClientFactory>();

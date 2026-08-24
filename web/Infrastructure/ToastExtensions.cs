@@ -2,6 +2,13 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace web.Infrastructure
 {
+    /// <summary>
+    /// Typed shape for a JSON toast response (see ToastExtensions.ToastJson), used instead of an anonymous
+    /// object so ToastTranslationFilter (see ToastTranslation.cs) can reliably recognize and translate it -
+    /// an anonymous type can't be pattern-matched or rebuilt with a changed property.
+    /// </summary>
+    public sealed record ToastPayload(bool Success, string Message, string Type);
+
     public static class ToastExtensions
     {
         public const string SuccessKey = "SuccessMessage";
@@ -34,7 +41,7 @@ namespace web.Infrastructure
         /// </summary>
         public static JsonResult ToastJson(this Controller controller, bool success, string message, string type)
         {
-            return controller.Json(new { success, message, type });
+            return controller.Json(new ToastPayload(success, message, type));
         }
 
         public static JsonResult ToastSuccessJson(this Controller controller, string message)

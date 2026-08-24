@@ -16,6 +16,7 @@ namespace web.Repositories.Documents
         private readonly IConfiguration _config;
         private readonly ILogger<DocumentsService> _logger;
         private readonly LanguageTools _language;
+        private readonly IAiGatewayConfigurationProvider _aiGatewayConfigurationProvider;
 
         public DocumentsService(
             ApplicationDbContext context,
@@ -30,6 +31,7 @@ namespace web.Repositories.Documents
             _config = config;
             _logger = logger;
             _language = aiGatewayService.Language(aiGatewayConfigurationProvider);
+            _aiGatewayConfigurationProvider = aiGatewayConfigurationProvider;
         }
 
         public async Task<List<DocumentGroupDto>> GetGroupsAsync(CancellationToken ct = default)
@@ -356,10 +358,29 @@ namespace web.Repositories.Documents
                 truncated = true;
             }
 
+            // Overrides DefaultChatModel with AiGateway:TranslationModel when one is configured — see
+            // AiGatewaySettings.TranslationModel for why: DefaultChatModel is sometimes a reasoning
+            // model, and reasoning models turned out (confirmed by live testing) to be unreliable here,
+            // silently spending their whole token budget on hidden reasoning instead of ever answering.
+            var aiConfig = await _aiGatewayConfigurationProvider.GetActiveConfigurationAsync(ct);
+            var translationModel = string.IsNullOrWhiteSpace(aiConfig.TranslationModel) ? null : aiConfig.TranslationModel;
+
+            // Only a short sample, not the whole (possibly 45,000-char) document — confirmed by live testing
+            // that this isn't just a cost optimization but fixes a real correctness bug: given the full text
+            // of a long document as the "detect the language" prompt, the model would ignore the "answer
+            // with only the language name" instruction and instead write a multi-paragraph summary of the
+            // document's content, which then can't be matched to any known language name (AppLanguages.
+            // CodeFromDanishName returns null), silently falling through to "go ahead and translate anyway"
+            // below — even for a document already in the target language. A short excerpt reliably gets a
+            // clean one-word answer instead (a document's language doesn't change partway through anyway).
+            var languageSample = extracted.Length > DocumentLimits.LanguageDetectionSampleChars
+                ? extracted[..DocumentLimits.LanguageDetectionSampleChars]
+                : extracted;
+
             string? sourceLanguageCode;
             try
             {
-                sourceLanguageCode = await _language.DetectLanguageCodeAsync(extracted, cancellationToken: ct);
+                sourceLanguageCode = await _language.DetectLanguageCodeAsync(languageSample, model: translationModel, cancellationToken: ct);
             }
             catch (Exception ex)
             {
@@ -391,26 +412,27 @@ namespace web.Repositories.Documents
                 var translatedChunks = new List<string>(chunks.Count);
                 foreach (var chunk in chunks)
                 {
-                    // A "thinking" model can occasionally burn its whole response on hidden reasoning and
+                    // A "thinking" model can occasionally burn its context budget on hidden reasoning and
                     // never reach the actual answer (see LanguageTools.TranslateDocumentToMarkdownAsync) -
-                    // that shows up here as an empty result. One retry clears most of these; if it comes
-                    // back empty twice in a row, treat it as a real failure rather than looping forever.
-                    var translatedChunk = await _language.TranslateDocumentToMarkdownAsync(chunk, targetNative, sourceNative, cancellationToken: ct);
-                    if (string.IsNullOrWhiteSpace(translatedChunk))
+                    // that shows up here as an empty result. Seen in practice as intermittent and per-chunk
+                    // (a different chunk fails on each attempt, not the same one every time), so a few
+                    // retries meaningfully improve the odds - only give up once it comes back empty on
+                    // every attempt.
+                    var translatedChunk = string.Empty;
+                    for (var attempt = 1; attempt <= DocumentLimits.TranslationChunkMaxAttempts; attempt++)
                     {
+                        translatedChunk = await _language.TranslateDocumentToMarkdownAsync(chunk, targetNative, sourceNative, model: translationModel, cancellationToken: ct);
+                        if (!string.IsNullOrWhiteSpace(translatedChunk)) break;
+
                         _logger.LogWarning(
-                            "Document translation returned an empty chunk for document {DocumentId} ({ChunkIndex}/{ChunkCount}) - retrying once",
-                            documentId, translatedChunks.Count + 1, chunks.Count);
-                        translatedChunk = await _language.TranslateDocumentToMarkdownAsync(chunk, targetNative, sourceNative, cancellationToken: ct);
+                            "Document translation returned an empty chunk for document {DocumentId} ({ChunkIndex}/{ChunkCount}), attempt {Attempt}/{MaxAttempts}{GivingUp}",
+                            documentId, translatedChunks.Count + 1, chunks.Count, attempt, DocumentLimits.TranslationChunkMaxAttempts,
+                            attempt == DocumentLimits.TranslationChunkMaxAttempts ? " - giving up" : " - retrying");
                     }
 
                     if (string.IsNullOrWhiteSpace(translatedChunk))
-                    {
-                        _logger.LogWarning(
-                            "Document translation returned an empty chunk twice for document {DocumentId} ({ChunkIndex}/{ChunkCount}), giving up",
-                            documentId, translatedChunks.Count + 1, chunks.Count);
                         return new TranslateDocumentResponseDto { Success = false, ErrorMessage = "Oversættelsen mislykkedes. Prøv igen senere." };
-                    }
+
                     translatedChunks.Add(translatedChunk);
                     onProgress?.Invoke(translatedChunks.Count);
                 }

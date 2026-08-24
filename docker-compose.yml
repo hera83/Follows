@@ -37,6 +37,11 @@ services:
       AiGateway__DefaultTtsModel: ${AI_GATEWAY_DEFAULT_TTS_MODEL:-}
       AiGateway__DefaultTtsVoice: ${AI_GATEWAY_DEFAULT_TTS_VOICE:-}
       AiGateway__DefaultSttModel: ${AI_GATEWAY_DEFAULT_STT_MODEL:-}
+      # Chat model used specifically for translation (Documents page "Oversæt"-button + Feed's
+      # post/comment auto-translate) instead of DefaultChatModel above — set this to a non-reasoning/
+      # non-"thinking" model. Leave blank to just use DefaultChatModel. See
+      # AiGatewaySettings.TranslationModel for why this exists.
+      AiGateway__TranslationModel: ${AI_GATEWAY_TRANSLATION_MODEL:-}
       AiGateway__RequestTimeoutSeconds: ${AI_GATEWAY_REQUEST_TIMEOUT_SECONDS:-600}
 
       # Ollama - leave blank to keep it disabled

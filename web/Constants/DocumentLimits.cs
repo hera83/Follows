@@ -46,27 +46,49 @@ namespace web.Constants
             || contentType == "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
         /// <summary>
-        /// Upper bound on how much extracted text is sent to the translation model in one go. Long
-        /// documents are truncated to this many characters — the caller is told so it can flag it to the
-        /// user — to stay within typical local-model context limits.
+        /// How much of a document's extracted text is sent to the model to detect its language (see
+        /// DocumentsService.TranslateDocumentAsync), before deciding whether it even needs translating.
+        /// Deliberately a short excerpt, not the whole document — confirmed by live testing to matter for
+        /// correctness, not just cost: given a long document as the "what language is this" prompt, the
+        /// model ignored the "answer with only the language name" instruction and wrote a summary of the
+        /// content instead, which then can't be matched back to a language and was silently treated as
+        /// "translate anyway", including for documents already in the target language. A short excerpt
+        /// answers reliably (a document's language doesn't change partway through anyway), and is also
+        /// the cheap, fast check it should be — no need to burn a chunk-sized prompt on it.
         /// </summary>
-        public const int MaxTranslatableChars = 20_000;
+        public const int LanguageDetectionSampleChars = 2_000;
+
+        /// <summary>
+        /// Upper bound on how much extracted text is translated. Longer documents are truncated to this
+        /// many characters — the caller is told so it can flag it to the user — as a cost/time safety
+        /// valve, not a model context limit (text is chunked well below any context limit regardless, see
+        /// TranslationChunkChars).
+        ///
+        /// Was previously 20,000 (well under 7 pages at ~3,000 chars/page) — too low for an ordinary
+        /// multi-page document (an 11-page upload would silently lose its last third+ before translation
+        /// even started, with only an easy-to-miss toast saying so). Raised to comfortably cover a document
+        /// in the 10-15 page range, matching TranslationJobTimeoutMinutes below (~15 chunks worth of
+        /// sequential per-chunk translation time still finishes well inside the job timeout).
+        /// </summary>
+        public const int MaxTranslatableChars = 45_000;
 
         /// <summary>
         /// Extracted text is translated in chunks of roughly this many characters, split at paragraph/
         /// table boundaries — sending a whole long document as one prompt risks silently running out of
         /// the model's context window mid-generation (Ollama just stops, with no error), which reads as
-        /// "only the first third got translated". Small chunks leave the model plenty of context headroom
-        /// (some models spend a chunk of their budget on hidden reasoning before answering — see
-        /// LanguageTools.TranslateDocumentToMarkdownAsync) and translate completely every time.
+        /// "only the first third got translated". Chunks leave the model context headroom (see
+        /// LanguageTools.TranslateDocumentToMarkdownAsync's NumCtx) to translate completely every time.
         ///
-        /// Deliberately smaller than you might pick for throughput alone: chunks are still translated one
-        /// at a time, never in parallel (the AI Gateway only serves one request at a time), so this number
-        /// also sets the granularity of the "X af Y" progress shown while translating (see
-        /// DocumentTranslationJobTracker) — smaller chunks mean more frequent, visible progress instead of
-        /// long stretches with no feedback, at the cost of a bit more per-chunk request overhead.
+        /// Previously set much smaller (900) purely for a finer-grained "X af Y" progress display (see
+        /// DocumentTranslationJobTracker) — turned out to be a bad trade: a manual side-by-side comparison
+        /// (the same model, asked directly to translate one whole page in ~1 minute, no trouble) against
+        /// this service's many small sequential chunk-calls (each paying its own AI Gateway round-trip, and
+        /// - without an explicit KeepAlive, see LanguageTools - risking a full model reload if the gap
+        /// between calls runs long) showed the per-request overhead, not per-character translation cost, is
+        /// what actually dominates wall-clock time. Fewer, larger chunks amortize that overhead instead of
+        /// paying it 10+ times per document. The progress bar just shows coarser steps as a result.
         /// </summary>
-        public const int TranslationChunkChars = 900;
+        public const int TranslationChunkChars = 3_000;
 
         /// <summary>
         /// Hard upper bound on how long one background translation job (see DocumentTranslationJobTracker)
@@ -74,8 +96,25 @@ namespace web.Constants
         /// Gateway call would hold TranslationSlot forever and silently block every other document
         /// translation behind it — since nothing else ever cancels a background job (it deliberately keeps
         /// running even if the browser that started it closes, so the result still gets cached).
+        ///
+        /// Raised from 15 alongside MaxTranslatableChars above — a ~15-page document, chunked at
+        /// TranslationChunkChars and translated one chunk at a time (never in parallel — the AI Gateway
+        /// only serves one request at a time), needs headroom for roughly a minute per chunk plus the
+        /// occasional retry (see TranslationChunkMaxAttempts), not just per-page translation time. Keep
+        /// this comfortably above the client's TRANSLATE_POLL_TIMEOUT_MS in Group.cshtml, so a slow-but-
+        /// working job isn't cut off client-side before it gets the chance to actually finish server-side.
         /// </summary>
-        public const int TranslationJobTimeoutMinutes = 15;
+        public const int TranslationJobTimeoutMinutes = 25;
+
+        /// <summary>
+        /// How many times a single chunk is tried before giving up on the whole translation, when the
+        /// model comes back with an empty result (see DocumentsService.TranslateDocumentAsync). A "thinking"
+        /// model occasionally burns its context budget on hidden reasoning and never reaches an actual
+        /// answer - seen in practice as an intermittent, per-chunk failure (a different chunk fails on each
+        /// attempt, not the same one every time), so a few retries meaningfully improve the odds of getting
+        /// a real answer rather than papering over a hard, deterministic failure.
+        /// </summary>
+        public const int TranslationChunkMaxAttempts = 3;
 
         /// <summary>Bootstrap Icons class for a document row, chosen from its content type.</summary>
         public static string IconClassFor(string contentType) => contentType switch
