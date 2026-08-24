@@ -19,10 +19,10 @@
             <span class="feed-translated-badge"><i class="bi bi-translate"></i> @Model.TranslatedLabel</span>
         }
     </div>
-    <time class="feed-time feed-comment-time" data-utc="@Model.CreatedAtUtc.ToString("o")">@Model.CreatedAtUtc.ToString("d. MMM HH:mm")</time>
+    <time class="feed-time feed-comment-time" data-utc="@Model.CreatedAtUtc.ToString("o")">@Model.CreatedAtUtc.ToString("d. MMM HH:mm", new System.Globalization.CultureInfo(web.Constants.AppLanguages.GetLocaleTag(CurrentLanguage)))</time>
     @if (Model.CanDelete)
     {
-        <button type="button" class="feed-delete-comment" data-comment-id="@Model.Id" title="Slet kommentar" aria-label="Slet kommentar">
+        <button type="button" class="feed-delete-comment" data-comment-id="@Model.Id" title="@T("Slet kommentar")" aria-label="@T("Slet kommentar")">
             <i class="bi bi-x-lg"></i>
         </button>
     }

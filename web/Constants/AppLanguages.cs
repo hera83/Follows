@@ -62,6 +62,49 @@ namespace web.Constants
         /// <summary>Native (autonym) display name for a language code, e.g. "da" -&gt; "Dansk". Normalizes first.</summary>
         public static string GetNativeName(string? code) => All.First(l => l.Code == Normalize(code)).NativeName;
 
+        // BCP-47 locale tags for JS Date formatting (toLocaleDateString/toLocaleString) and relative-time
+        // phrasing in Feed - see AppLanguages.GetLocaleTag and Feed/Index.cshtml's script block. One
+        // reasonable regional variant per language; not meant to cover every regional dialect.
+        private static readonly Dictionary<string, string> LocaleTags = new()
+        {
+            ["da"] = "da-DK",
+            ["en"] = "en-US",
+            ["zh"] = "zh-CN",
+            ["hi"] = "hi-IN",
+            ["es"] = "es-ES",
+            ["fr"] = "fr-FR",
+            ["ar"] = "ar-SA",
+            ["bn"] = "bn-BD",
+            ["pt"] = "pt-PT",
+            ["ru"] = "ru-RU",
+            ["ur"] = "ur-PK",
+            ["id"] = "id-ID",
+            ["de"] = "de-DE",
+            ["ja"] = "ja-JP",
+            ["mr"] = "mr-IN",
+            ["te"] = "te-IN",
+            ["tr"] = "tr-TR",
+            ["ta"] = "ta-IN",
+            ["vi"] = "vi-VN",
+            ["ko"] = "ko-KR",
+            ["it"] = "it-IT",
+            ["th"] = "th-TH",
+            ["fa"] = "fa-IR",
+            ["sw"] = "sw-KE",
+            ["pl"] = "pl-PL",
+            ["uk"] = "uk-UA",
+            ["nl"] = "nl-NL",
+            ["el"] = "el-GR",
+            ["sv"] = "sv-SE",
+            ["no"] = "nb-NO",
+            ["fi"] = "fi-FI",
+            ["is"] = "is-IS",
+        };
+
+        /// <summary>BCP-47 locale tag for a language code, e.g. "da" -&gt; "da-DK". Normalizes first, falls back to "da-DK".</summary>
+        public static string GetLocaleTag(string? code) =>
+            LocaleTags.TryGetValue(Normalize(code), out var tag) ? tag : LocaleTags[Default];
+
         // Maps the Danish language names LanguageTools.DetectLanguageAsync can answer with back to
         // codes above. A few common alternate spellings are included since the model isn't always
         // perfectly consistent (e.g. "Farsi" vs. "Persisk").

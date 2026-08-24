@@ -2,7 +2,7 @@
 @using web.Constants
 
 <div>
-    <a asp-action="Index" class="doc-back-link"><i class="bi bi-arrow-left me-1"></i>Documents</a>
+    <a asp-action="Index" class="doc-back-link"><i class="bi bi-arrow-left me-1"></i>@T("Documents")</a>
 
     <div class="page-header">
         <h1><i class="bi bi-folder2-open me-2"></i><span id="documentGroupName">@Model.Name</span></h1>
@@ -13,14 +13,14 @@
         <div class="table-toolbar-end">
             @if (Model.CanManage)
             {
-                <button class="btn btn-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#editDocumentGroupModal" title="Rediger gruppe" aria-label="Rediger gruppe">
+                <button class="btn btn-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#editDocumentGroupModal" title="@T("Rediger gruppe")" aria-label="@T("Rediger gruppe")">
                     <i class="bi bi-pencil"></i>
                 </button>
-                <button class="btn btn-outline-danger btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#deleteDocumentGroupModal" title="Slet gruppe" aria-label="Slet gruppe">
+                <button class="btn btn-outline-danger btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#deleteDocumentGroupModal" title="@T("Slet gruppe")" aria-label="@T("Slet gruppe")">
                     <i class="bi bi-trash"></i>
                 </button>
             }
-            <button class="btn btn-primary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#uploadDocumentModal" title="Upload dokumenter" aria-label="Upload dokumenter">
+            <button class="btn btn-primary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#uploadDocumentModal" title="@T("Upload dokumenter")" aria-label="@T("Upload dokumenter")">
                 <i class="bi bi-cloud-upload"></i>
             </button>
         </div>
@@ -41,22 +41,22 @@
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="GroupId" value="@Model.Id" />
                     <div class="modal-header">
-                        <h1 class="modal-title fs-5" id="editDocumentGroupModalLabel"><i class="bi bi-pencil me-2"></i>Rediger gruppe</h1>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                        <h1 class="modal-title fs-5" id="editDocumentGroupModalLabel"><i class="bi bi-pencil me-2"></i>@T("Rediger gruppe")</h1>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Luk")"></button>
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label">Navn</label>
+                            <label class="form-label">@T("Navn")</label>
                             <input name="Name" class="form-control" value="@Model.Name" required maxlength="@DocumentLimits.MaxGroupNameLength" />
                         </div>
                         <div class="mb-0">
-                            <label class="form-label">Beskrivelse (valgfri)</label>
+                            <label class="form-label">@T("Beskrivelse (valgfri)")</label>
                             <textarea name="Description" class="form-control" rows="2" maxlength="@DocumentLimits.MaxGroupDescriptionLength">@Model.Description</textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Annuller</button>
-                        <button type="submit" class="btn btn-primary"><i class="bi bi-floppy me-1"></i>Gem</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>@T("Annuller")</button>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-floppy me-1"></i>@T("Gem")</button>
                     </div>
                 </form>
             </div>
@@ -68,18 +68,18 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h1 class="modal-title fs-5" id="deleteDocumentGroupModalLabel"><i class="bi bi-exclamation-triangle text-danger me-2"></i>Slet gruppe</h1>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                    <h1 class="modal-title fs-5" id="deleteDocumentGroupModalLabel"><i class="bi bi-exclamation-triangle text-danger me-2"></i>@T("Slet gruppe")</h1>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Luk")"></button>
                 </div>
                 <div class="modal-body">
-                    Er du sikker på, at du vil slette gruppen <strong>@Model.Name</strong>? Alle dokumenter i gruppen slettes også. Denne handling kan ikke fortrydes.
+                    @T("Er du sikker på, at du vil slette gruppen") <strong>@Model.Name</strong>? @T("Alle dokumenter i gruppen slettes også. Denne handling kan ikke fortrydes.")
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Annuller</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>@T("Annuller")</button>
                     <form asp-action="DeleteGroup" method="post" id="deleteDocumentGroupForm">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="groupId" value="@Model.Id" />
-                        <button type="submit" class="btn btn-danger"><i class="bi bi-trash me-1"></i>Slet</button>
+                        <button type="submit" class="btn btn-danger"><i class="bi bi-trash me-1"></i>@T("Slet")</button>
                     </form>
                 </div>
             </div>
@@ -95,20 +95,20 @@
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="groupId" value="@Model.Id" />
                 <div class="modal-header">
-                    <h1 class="modal-title fs-5" id="uploadDocumentModalLabel"><i class="bi bi-cloud-upload me-2"></i>Upload dokumenter</h1>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                    <h1 class="modal-title fs-5" id="uploadDocumentModalLabel"><i class="bi bi-cloud-upload me-2"></i>@T("Upload dokumenter")</h1>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Luk")"></button>
                 </div>
                 <div class="modal-body">
-                    <label class="form-label">Filer</label>
+                    <label class="form-label">@T("Filer")</label>
                     <input type="file" name="files" class="form-control" multiple required
                            accept=".pdf,.txt,.jpg,.jpeg,.png,.webp,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx" />
-                    <div class="form-text">Højst @DocumentLimits.MaxFilesPerUpload filer, max @(DocumentLimits.MaxFileBytes / 1024 / 1024) MB pr. fil. PDF, tekst, billeder, Word, Excel og PowerPoint understøttes.</div>
+                    <div class="form-text">@T("Højst") @DocumentLimits.MaxFilesPerUpload @T("filer, max") @(DocumentLimits.MaxFileBytes / 1024 / 1024) @T("MB pr. fil. PDF, tekst, billeder, Word, Excel og PowerPoint understøttes.")</div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Annuller</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>@T("Annuller")</button>
                     <button type="submit" class="btn btn-primary">
                         <span class="spinner-border spinner-border-sm me-1 d-none" data-upload-spinner></span>
-                        <i class="bi bi-cloud-upload me-1" data-upload-icon></i> Upload
+                        <i class="bi bi-cloud-upload me-1" data-upload-icon></i> @T("Upload")
                     </button>
                 </div>
             </form>
@@ -121,18 +121,18 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h1 class="modal-title fs-5" id="deleteDocumentModalLabel"><i class="bi bi-exclamation-triangle text-danger me-2"></i>Slet dokument</h1>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                <h1 class="modal-title fs-5" id="deleteDocumentModalLabel"><i class="bi bi-exclamation-triangle text-danger me-2"></i>@T("Slet dokument")</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Luk")"></button>
             </div>
             <div class="modal-body">
-                Er du sikker på, at du vil slette dokumentet <strong id="deleteDocumentName"></strong>? Denne handling kan ikke fortrydes.
+                @T("Er du sikker på, at du vil slette dokumentet") <strong id="deleteDocumentName"></strong>? @T("Denne handling kan ikke fortrydes.")
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Annuller</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>@T("Annuller")</button>
                 <form asp-action="DeleteDocument" method="post">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="documentId" id="deleteDocumentInput" />
-                    <button type="submit" class="btn btn-danger"><i class="bi bi-trash me-1"></i>Slet</button>
+                    <button type="submit" class="btn btn-danger"><i class="bi bi-trash me-1"></i>@T("Slet")</button>
                 </form>
             </div>
         </div>
@@ -147,19 +147,19 @@
                 <h1 class="modal-title fs-5" id="documentPreviewModalLabel">
                     <i class="bi bi-file-earmark me-2" id="documentPreviewIcon"></i><span id="documentPreviewTitle"></span>
                 </h1>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Luk")"></button>
             </div>
             <div class="modal-body doc-preview-body" id="documentPreviewBody"></div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary d-none" id="documentTranslateBackBtn" title="Tilbage til den oprindelige fil">
-                    <i class="bi bi-arrow-left me-1"></i>Tilbage
+                <button type="button" class="btn btn-secondary d-none" id="documentTranslateBackBtn" title="@T("Tilbage til den oprindelige fil")">
+                    <i class="bi bi-arrow-left me-1"></i>@T("Tilbage")
                 </button>
-                <button type="button" class="btn btn-secondary" id="documentTranslateBtn" title="Oversæt til dit foretrukne sprog">
+                <button type="button" class="btn btn-secondary" id="documentTranslateBtn" title="@T("Oversæt til dit foretrukne sprog")">
                     <span class="spinner-border spinner-border-sm me-1 d-none" data-translate-spinner></span>
-                    <i class="bi bi-translate me-1" data-translate-icon></i><span data-translate-label>Oversæt</span>
+                    <i class="bi bi-translate me-1" data-translate-icon></i><span data-translate-label>@T("Oversæt")</span>
                 </button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Luk</button>
-                <a class="btn btn-primary" id="documentPreviewDownload" download><i class="bi bi-download me-1"></i>Download</a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>@T("Luk")</button>
+                <a class="btn btn-primary" id="documentPreviewDownload" download><i class="bi bi-download me-1"></i>@T("Download")</a>
             </div>
         </div>
     </div>
@@ -256,9 +256,9 @@
             // følger samme tilstand, da den kun giver mening mens en oversættelse vises.
             const setTranslateButtonMode = (isRetry) => {
                 hasTranslatedResult = isRetry;
-                if (translateLabel) translateLabel.textContent = isRetry ? 'Genoversæt' : 'Oversæt';
+                if (translateLabel) translateLabel.textContent = isRetry ? @TJs("Genoversæt") : @TJs("Oversæt");
                 if (translateIcon) translateIcon.className = `bi ${isRetry ? 'bi-arrow-repeat' : 'bi-translate'} me-1`;
-                if (translateBtn) translateBtn.title = isRetry ? 'Oversæt dokumentet igen (ignorerer den gemte oversættelse)' : 'Oversæt til dit foretrukne sprog';
+                if (translateBtn) translateBtn.title = isRetry ? @TJs("Oversæt dokumentet igen (ignorerer den gemte oversættelse)") : @TJs("Oversæt til dit foretrukne sprog");
                 translateBackBtn?.classList.toggle('d-none', !isRetry);
             };
 
@@ -266,13 +266,13 @@
             // åbnes første gang, og når man trykker "Tilbage" fra den oversatte Markdown-visning.
             const renderOriginalPreview = async (id, title, contentType, canPreview) => {
                 const viewUrl = `@Url.Action("View")/${id}`;
-                previewBody.innerHTML = '<div class="doc-preview-loading"><span class="spinner-border spinner-border-sm me-2"></span>Indlæser...</div>';
+                previewBody.innerHTML = `<div class="doc-preview-loading"><span class="spinner-border spinner-border-sm me-2"></span>${@TJs("Indlæser...")}</div>`;
 
                 if (!canPreview) {
                     previewBody.innerHTML = `
                         <div class="doc-preview-fallback">
                             <i class="bi bi-file-earmark-x"></i>
-                            <p>Forhåndsvisning er ikke tilgængelig for denne filtype.<br>Brug download-knappen for at åbne filen.</p>
+                            <p>${@TJs("Forhåndsvisning er ikke tilgængelig for denne filtype.")}<br>${@TJs("Brug download-knappen for at åbne filen.")}</p>
                         </div>`;
                     return;
                 }
@@ -291,7 +291,7 @@
                         previewBody.innerHTML = '';
                         previewBody.appendChild(pre);
                     } catch {
-                        previewBody.innerHTML = '<div class="doc-preview-fallback"><p>Kunne ikke indlæse filen.</p></div>';
+                        previewBody.innerHTML = `<div class="doc-preview-fallback"><p>${@TJs("Kunne ikke indlæse filen.")}</p></div>`;
                     }
                 }
             };
@@ -349,8 +349,8 @@
                 translateBtn.disabled = true;
                 translateSpinner?.classList.remove('d-none');
                 translateIcon?.classList.add('d-none');
-                translateBtn.title = 'Oversætter...';
-                if (translateLabel) translateLabel.textContent = 'Oversætter...';
+                translateBtn.title = @TJs("Oversætter...");
+                if (translateLabel) translateLabel.textContent = @TJs("Oversætter...");
 
                 const wasRetry = hasTranslatedResult;
 
@@ -366,7 +366,7 @@
                     });
                     const startData = await startRes.json();
                     if (!startRes.ok || !startData.jobId) {
-                        FvToast.show(startData.type || 'error', startData.message || 'Oversættelsen kunne ikke startes.');
+                        FvToast.show(startData.type || 'error', startData.message || @TJs("Oversættelsen kunne ikke startes."));
                         return;
                     }
 
@@ -379,7 +379,7 @@
                             headers: { 'X-Requested-With': 'fetch' }
                         });
                         if (!statusRes.ok) {
-                            FvToast.show('error', 'Kunne ikke følge oversættelsens status. Prøv igen.');
+                            FvToast.show('error', @TJs("Kunne ikke følge oversættelsens status. Prøv igen."));
                             return;
                         }
                         data = await statusRes.json();
@@ -388,8 +388,8 @@
                             // AiGatewayen håndterer kun én oversættelse ad gangen (se DocumentTranslationJobTracker)
                             // — "queued" betyder et andet dokument er ved at blive oversat lige nu, ikke at noget hænger.
                             const label = data.queued
-                                ? 'I kø... venter på en anden oversættelse'
-                                : (data.total > 0 ? `Oversætter... ${data.completed} af ${data.total}` : 'Oversætter...');
+                                ? @TJs("I kø... venter på en anden oversættelse")
+                                : (data.total > 0 ? `${@TJs("Oversætter...")} ${data.completed} ${@TJs("af")} ${data.total}` : @TJs("Oversætter..."));
                             if (translateLabel) translateLabel.textContent = label;
                             translateBtn.title = label;
                             continue;
@@ -398,12 +398,12 @@
                     }
 
                     if (!data || data.status === 'running') {
-                        FvToast.show('error', 'Oversættelsen tager usædvanligt lang tid. Den fortsætter i baggrunden — prøv "Oversæt" igen om lidt.');
+                        FvToast.show('error', @TJs("Oversættelsen tager usædvanligt lang tid. Den fortsætter i baggrunden — prøv \"Oversæt\" igen om lidt."));
                         return;
                     }
 
                     if (data.status === 'failed') {
-                        FvToast.show('error', data.message || 'Oversættelsen mislykkedes.');
+                        FvToast.show('error', data.message || @TJs("Oversættelsen mislykkedes."));
                         return;
                     }
 
@@ -413,7 +413,7 @@
                         // targetLanguageName, for så ville teksten altid blive på dansk uanset brugerens
                         // sprogindstilling (ingen {success, message, type}-formet JSON-response for
                         // ToastTranslationFilter at oversætte i stedet).
-                        FvToast.show('info', data.message || `Dokumentet er allerede på ${data.targetLanguageName}.`);
+                        FvToast.show('info', data.message || `${@TJs("Dokumentet er allerede på")} ${data.targetLanguageName}.`);
                         return;
                     }
 
@@ -424,10 +424,10 @@
                     if (data.truncated) {
                         // Se kommentaren ved alreadyInTargetLanguage ovenfor - samme grund til at bruge
                         // data.message frem for en hårdkodet dansk streng her.
-                        FvToast.show('warning', data.message || 'Dokumentet var langt og blev afkortet før oversættelse — enkelte afsnit mangler muligvis.');
+                        FvToast.show('warning', data.message || @TJs("Dokumentet var langt og blev afkortet før oversættelse — enkelte afsnit mangler muligvis."));
                     }
                 } catch {
-                    FvToast.show('error', 'Netværksfejl. Prøv igen.');
+                    FvToast.show('error', @TJs("Netværksfejl. Prøv igen."));
                 } finally {
                     translateBtn.disabled = false;
                     translateSpinner?.classList.add('d-none');

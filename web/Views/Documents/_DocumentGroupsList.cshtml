@@ -4,8 +4,8 @@
 {
     <div class="doc-empty">
         <i class="bi bi-folder2-open"></i>
-        <h2>Ingen grupper endnu</h2>
-        <p>Opret en gruppe (fx "Skoleskemaer" eller "Håndbold") for at komme i gang med at uploade dokumenter.</p>
+        <h2>@T("Ingen grupper endnu")</h2>
+        <p>@T("Opret en gruppe (fx \"Skoleskemaer\" eller \"Håndbold\") for at komme i gang med at uploade dokumenter.")</p>
     </div>
 }
 else
@@ -14,7 +14,7 @@ else
         @foreach (var group in Model.Groups)
         {
             <div class="card doc-group-card">
-                <a class="doc-group-card-link" asp-action="Group" asp-route-id="@group.Id" title="Åbn @group.Name">
+                <a class="doc-group-card-link" asp-action="Group" asp-route-id="@group.Id" title="@T("Åbn") @group.Name">
                     <div class="doc-group-card-icon"><i class="bi bi-folder2-open"></i></div>
                     <div class="doc-group-card-body">
                         <h3 class="doc-group-card-name">@group.Name</h3>
@@ -23,7 +23,7 @@ else
                             <p class="doc-group-card-desc">@group.Description</p>
                         }
                         <span class="doc-group-card-count">
-                            <i class="bi bi-file-earmark"></i> @group.DocumentCount dokument@(group.DocumentCount == 1 ? "" : "er")
+                            <i class="bi bi-file-earmark"></i> @group.DocumentCount @(group.DocumentCount == 1 ? T("dokument") : T("dokumenter"))
                         </span>
                     </div>
                 </a>

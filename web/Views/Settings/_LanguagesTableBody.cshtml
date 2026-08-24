@@ -1,0 +1,41 @@
+@model List<web.ViewModels.LanguageProgressViewModel>
+
+@foreach (var lang in Model)
+{
+    <tr data-language-code="@lang.LanguageCode" data-native-name="@lang.NativeName" data-is-running="@lang.IsRunning.ToString().ToLowerInvariant()">
+        <td>@lang.NativeName <span class="text-muted small">(@lang.LanguageCode)</span></td>
+        <td style="min-width: 220px;">
+            @if (lang.IsRunning)
+            {
+                var runningPercent = lang.RunningTotal > 0 ? (int)Math.Round(lang.RunningCompleted * 100.0 / lang.RunningTotal) : 0;
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: @(runningPercent)%"></div>
+                </div>
+                <span class="small text-muted">Oversætter... @lang.RunningCompleted af @lang.RunningTotal</span>
+            }
+            else
+            {
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar @(lang.PercentComplete >= 100 ? "bg-success" : "bg-primary")" style="width: @(lang.PercentComplete)%"></div>
+                </div>
+                <span class="small text-muted">@lang.PercentComplete% (@lang.TranslatedCount af @lang.TotalCount)</span>
+            }
+        </td>
+        <td class="text-end">
+            <div class="d-inline-flex gap-1">
+                <button type="button" class="btn btn-sm btn-secondary btn-icon language-refresh-btn"
+                        data-language-code="@lang.LanguageCode"
+                        title="Genoversæt @lang.NativeName fra bunden" aria-label="Genoversæt @lang.NativeName fra bunden"
+                        @(lang.IsRunning ? "disabled" : "")>
+                    <i class="bi bi-arrow-repeat"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-danger btn-icon language-remove-btn"
+                        data-language-code="@lang.LanguageCode"
+                        title="Fjern @lang.NativeName" aria-label="Fjern @lang.NativeName"
+                        @(lang.IsRunning ? "disabled" : "")>
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </td>
+    </tr>
+}

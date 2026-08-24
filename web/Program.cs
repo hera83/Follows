@@ -7,6 +7,7 @@ using web.Data;
 using web.Data.Entities;
 using web.Constants;
 using web.Infrastructure;
+using web.Infrastructure.UiTranslation;
 using web.Repositories.Documents;
 using web.Repositories.Documents.Interfaces;
 using web.Repositories.Feed;
@@ -111,10 +112,22 @@ try
         // central place - see ToastTranslation.cs. Global so it runs for every controller action without
         // any of them needing to change.
         options.Filters.Add<ToastTranslationFilter>();
+
+        // Preloads the bulk UI-catalog translation dictionary (menu/Feed/Documents/Profil chrome) for the
+        // current viewer before every controller action runs, so @T()/@TJs() in views never need to await
+        // anything - see UiTranslationCatalog.cs. A separate mechanism from ToastTranslationFilter above
+        // (that one translates ad-hoc toast messages on demand; this one serves a persisted, bulk-
+        // translated catalog), registered independently so neither can break the other.
+        options.Filters.Add<UiTranslationCatalogFilter>();
     });
 
     // Custom services
     builder.Services.AddScoped<IToastTranslationService, ToastTranslationService>();
+    builder.Services.AddScoped<IUiTranslationCatalogService, UiTranslationCatalogService>();
+    builder.Services.AddSingleton<UiTranslationMissQueue>();
+    builder.Services.AddScoped<IUiTranslationBulkService, UiTranslationBulkService>();
+    builder.Services.AddSingleton<UiTranslationLanguageStatusTracker>();
+    builder.Services.AddHostedService<UiTranslationBackgroundWorker>();
     builder.Services.AddScoped<ILogReaderService, LogReaderService>();
     builder.Services.AddHttpClient("Ollama");
     builder.Services.AddSingleton<OllamaHttpClientFactory>();

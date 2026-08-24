@@ -1,4 +1,12 @@
 (() => {
+    // ─── UI-catalog lookup for this (genuinely external, non-Razor) file ───────
+    // window.i18n is a small (Danish text -> translated text) dictionary emitted by _Layout.cshtml
+    // (see LocalizedRazorPage.JsCatalogJson) for the handful of strings this file needs but can't fetch
+    // via @T() directly, since it isn't Razor-rendered. Falls back to the Danish key itself when missing
+    // (unauthenticated viewer, Danish profile, or a not-yet-translated string) - same fallback behavior as
+    // the server-side @T().
+    const T = (key) => (window.i18n && window.i18n[key]) || key;
+
     // ─── Sidebar ─────────────────────────────────────────────────────────────
     const shell = document.querySelector('.app-shell');
     const toggle = document.getElementById('sidebarToggle');
@@ -24,7 +32,7 @@
         if (!shell) return;
         shell.classList.remove('sidebar-mobile-open');
         mobileToggle?.setAttribute('aria-expanded', 'false');
-        mobileToggle?.setAttribute('aria-label', 'Åbn menu');
+        mobileToggle?.setAttribute('aria-label', T('Åbn menu'));
         mobileToggleIcon?.classList.replace('bi-x-lg', 'bi-list');
     };
 
@@ -32,7 +40,7 @@
         if (!shell) return;
         shell.classList.add('sidebar-mobile-open');
         mobileToggle?.setAttribute('aria-expanded', 'true');
-        mobileToggle?.setAttribute('aria-label', 'Luk menu');
+        mobileToggle?.setAttribute('aria-label', T('Luk menu'));
         mobileToggleIcon?.classList.replace('bi-list', 'bi-x-lg');
     };
 
@@ -109,7 +117,7 @@
         el.innerHTML = `
             <i class="bi ${preset.icon} fv-toast-icon"></i>
             <span></span>
-            <button class="fv-toast-close" type="button" aria-label="Luk"><i class="bi bi-x"></i></button>
+            <button class="fv-toast-close" type="button" aria-label="${T('Luk')}"><i class="bi bi-x"></i></button>
         `;
         el.querySelector('span').textContent = message;
         container.appendChild(el);
@@ -134,7 +142,7 @@
             showToast(data.type || (data.success ? 'success' : 'error'), data.message);
             return data;
         } catch {
-            showToast('error', 'Netværksfejl. Prøv igen.');
+            showToast('error', T('Netværksfejl. Prøv igen.'));
             return { success: false };
         }
     };

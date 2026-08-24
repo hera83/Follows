@@ -3,8 +3,8 @@
 
 <div>
     <div class="page-header">
-        <h1><i class="bi bi-images me-2"></i>Feeds</h1>
-        <p>Del historier, billeder og videoer fra dit ophold &mdash; så kan dine venner og familie følg med hjemmefra.</p>
+        <h1><i class="bi bi-images me-2"></i>@T("Feeds")</h1>
+        <p>@T("Del historier, billeder og videoer fra dit ophold — så kan dine venner og familie følg med hjemmefra.")</p>
     </div>
 
     <div class="feed-page">
@@ -28,7 +28,7 @@
                     </div>
                     <textarea name="Caption" id="feedComposerCaption" class="feed-composer-textarea" rows="2"
                               maxlength="@FeedLimits.MaxCaptionLength"
-                              placeholder="Del en historie fra opholdet..."></textarea>
+                              placeholder="@T("Del en historie fra opholdet...")"></textarea>
                 </div>
 
                 <div id="feedComposerPreview" class="feed-composer-preview"></div>
@@ -38,10 +38,10 @@
 
                 <div class="feed-composer-toolbar">
                     <button type="button" class="btn btn-secondary" id="feedComposerAttachBtn">
-                        <i class="bi bi-images me-1"></i> Billede/video
+                        <i class="bi bi-images me-1"></i> @T("Billede/video")
                     </button>
                     <button type="submit" class="btn btn-primary ms-auto" id="feedComposerSubmitBtn" disabled>
-                        <i class="bi bi-send me-1"></i> Del historie
+                        <i class="bi bi-send me-1"></i> @T("Del historie")
                     </button>
                 </div>
             </form>
@@ -51,8 +51,8 @@
         {
             <div class="feed-empty" id="feedEmptyState">
                 <i class="bi bi-images"></i>
-                <h2>Ingen opslag endnu</h2>
-                <p>Vær den første til at dele et billede, en video eller en historie fra opholdet.</p>
+                <h2>@T("Ingen opslag endnu")</h2>
+                <p>@T("Vær den første til at dele et billede, en video eller en historie fra opholdet.")</p>
             </div>
         }
 
@@ -73,15 +73,15 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h1 class="modal-title fs-5"><i class="bi bi-exclamation-triangle text-danger me-2"></i>Bekræft sletning</h1>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                <h1 class="modal-title fs-5"><i class="bi bi-exclamation-triangle text-danger me-2"></i>@T("Bekræft sletning")</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Luk")"></button>
             </div>
             <div class="modal-body">
-                <p id="feedConfirmDeleteText" class="mb-0">Er du sikker?</p>
+                <p id="feedConfirmDeleteText" class="mb-0">@T("Er du sikker?")</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Annuller</button>
-                <button type="button" class="btn btn-danger" id="feedConfirmDeleteBtn"><i class="bi bi-trash me-1"></i>Slet</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>@T("Annuller")</button>
+                <button type="button" class="btn btn-danger" id="feedConfirmDeleteBtn"><i class="bi bi-trash me-1"></i>@T("Slet")</button>
             </div>
         </div>
     </div>
@@ -93,27 +93,27 @@
         <div class="modal-content">
             <form id="feedEditForm">
                 <div class="modal-header">
-                    <h1 class="modal-title fs-5"><i class="bi bi-pencil me-2"></i>Rediger opslag</h1>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                    <h1 class="modal-title fs-5"><i class="bi bi-pencil me-2"></i>@T("Rediger opslag")</h1>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Luk")"></button>
                 </div>
                 <div class="modal-body">
                     <input type="hidden" id="feedEditPostId" />
                     <div class="mb-3">
-                        <label for="feedEditCaption" class="form-label">Historie</label>
+                        <label for="feedEditCaption" class="form-label">@T("Historie")</label>
                         <textarea id="feedEditCaption" class="form-control" rows="4" maxlength="@FeedLimits.MaxCaptionLength"></textarea>
                     </div>
                     @if (Model.CurrentUserIsModerator)
                     {
                         <div class="mb-3" id="feedEditDateWrap">
-                            <label for="feedEditDate" class="form-label">Dato og tidspunkt</label>
+                            <label for="feedEditDate" class="form-label">@T("Dato og tidspunkt")</label>
                             <input type="datetime-local" id="feedEditDate" class="form-control" />
-                            <div class="form-text">Kun admin/udvikler kan rette datoen — brug det til at lægge gamle begivenheder ind på deres rigtige plads i tidslinjen.</div>
+                            <div class="form-text">@T("Kun admin/udvikler kan rette datoen — brug det til at lægge gamle begivenheder ind på deres rigtige plads i tidslinjen.")</div>
                         </div>
                     }
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Annuller</button>
-                    <button type="submit" class="btn btn-primary" id="feedEditSaveBtn"><i class="bi bi-floppy me-1"></i>Gem</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>@T("Annuller")</button>
+                    <button type="submit" class="btn btn-primary" id="feedEditSaveBtn"><i class="bi bi-floppy me-1"></i>@T("Gem")</button>
                 </div>
             </form>
         </div>
@@ -122,10 +122,10 @@
 
 <!-- Lightbox -->
 <div class="feed-lightbox" id="feedLightbox" aria-hidden="true">
-    <button type="button" class="feed-lightbox-close" id="feedLightboxClose" aria-label="Luk"><i class="bi bi-x-lg"></i></button>
-    <button type="button" class="feed-lightbox-nav feed-lightbox-prev" id="feedLightboxPrev" aria-label="Forrige"><i class="bi bi-chevron-left"></i></button>
+    <button type="button" class="feed-lightbox-close" id="feedLightboxClose" aria-label="@T("Luk")"><i class="bi bi-x-lg"></i></button>
+    <button type="button" class="feed-lightbox-nav feed-lightbox-prev" id="feedLightboxPrev" aria-label="@T("Forrige")"><i class="bi bi-chevron-left"></i></button>
     <div class="feed-lightbox-content" id="feedLightboxContent"></div>
-    <button type="button" class="feed-lightbox-nav feed-lightbox-next" id="feedLightboxNext" aria-label="Næste"><i class="bi bi-chevron-right"></i></button>
+    <button type="button" class="feed-lightbox-nav feed-lightbox-next" id="feedLightboxNext" aria-label="@T("Næste")"><i class="bi bi-chevron-right"></i></button>
 </div>
 
 @section Scripts {
@@ -141,23 +141,38 @@
             const maxVideoBytes = parseInt(form.dataset.maxVideoBytes, 10);
 
             // ─── Relative timestamps ────────────────────────────────────────────
+            // window.appLocale is emitted by _Layout.cshtml (see AppLanguages.GetLocaleTag) - falls back
+            // to Danish if unset (unauthenticated viewer, very old cached page, ...). The phrase pieces
+            // below are resolved once, server-side, via @@TJs() - this script block is Razor-rendered, so
+            // there's no need for a runtime window.i18n lookup here the way site.js needs one.
+            const locale = window.appLocale || 'da-DK';
+            const relativeWords = {
+                now: @TJs("Lige nu"),
+                forWord: @TJs("for"),
+                minutesAgo: @TJs("min. siden"),
+                hoursAgo: @TJs("t. siden"),
+                day: @TJs("dag"),
+                days: @TJs("dage"),
+                agoSuffix: @TJs("siden"),
+                at: @TJs("kl.")
+            };
             const formatRelative = (iso) => {
                 const date = new Date(iso);
                 const diffMin = Math.floor((Date.now() - date.getTime()) / 60000);
-                if (diffMin < 1) return 'Lige nu';
-                if (diffMin < 60) return `for ${diffMin} min. siden`;
+                if (diffMin < 1) return relativeWords.now;
+                if (diffMin < 60) return `${relativeWords.forWord} ${diffMin} ${relativeWords.minutesAgo}`;
                 const diffH = Math.floor(diffMin / 60);
-                if (diffH < 24) return `for ${diffH} t. siden`;
+                if (diffH < 24) return `${relativeWords.forWord} ${diffH} ${relativeWords.hoursAgo}`;
                 const diffD = Math.floor(diffH / 24);
-                if (diffD < 7) return `for ${diffD} dag${diffD > 1 ? 'e' : ''} siden`;
-                return date.toLocaleDateString('da-DK', { day: 'numeric', month: 'short', year: 'numeric' }) +
-                    ' kl. ' + date.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
+                if (diffD < 7) return `${relativeWords.forWord} ${diffD} ${diffD > 1 ? relativeWords.days : relativeWords.day} ${relativeWords.agoSuffix}`;
+                return date.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' }) +
+                    ' ' + relativeWords.at + ' ' + date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
             };
 
             const formatTimes = (scope) => {
                 (scope || document).querySelectorAll('.feed-time[data-utc]').forEach((el) => {
                     el.textContent = formatRelative(el.dataset.utc);
-                    el.title = new Date(el.dataset.utc).toLocaleString('da-DK');
+                    el.title = new Date(el.dataset.utc).toLocaleString(locale);
                 });
             };
 
@@ -207,7 +222,7 @@
                     const removeBtn = document.createElement('button');
                     removeBtn.type = 'button';
                     removeBtn.className = 'feed-preview-remove';
-                    removeBtn.setAttribute('aria-label', 'Fjern');
+                    removeBtn.setAttribute('aria-label', @TJs("Fjern"));
                     removeBtn.innerHTML = '<i class="bi bi-x"></i>';
                     removeBtn.addEventListener('click', () => {
                         selectedFiles.splice(idx, 1);
@@ -228,13 +243,13 @@
                 const incoming = Array.from(fileInput.files || []);
                 for (const file of incoming) {
                     if (selectedFiles.length >= maxFiles) {
-                        window.FvToast.show('warning', `Du kan højst vedhæfte ${maxFiles} filer.`);
+                        window.FvToast.show('warning', `${@TJs("Du kan højst vedhæfte")} ${maxFiles} ${@TJs("filer.")}`);
                         break;
                     }
                     const isVideo = file.type.startsWith('video/');
                     const maxBytes = isVideo ? maxVideoBytes : maxImageBytes;
                     if (file.size > maxBytes) {
-                        window.FvToast.show('warning', `'${file.name}' er for stor.`);
+                        window.FvToast.show('warning', `'${file.name}' ${@TJs("er for stor.")}`);
                         continue;
                     }
                     selectedFiles.push(file);
@@ -284,7 +299,7 @@
 
                 submitBtn.disabled = true;
                 const originalHtml = submitBtn.innerHTML;
-                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Deler...';
+                submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> ${@TJs("Deler...")}`;
 
                 const data = await window.FvForm.submit(form);
 
@@ -438,7 +453,7 @@
                         likersCache.delete(btn.dataset.postId);
                     }
                 } catch {
-                    window.FvToast.show('error', 'Netværksfejl. Prøv igen.');
+                    window.FvToast.show('error', @TJs("Netværksfejl. Prøv igen."));
                 } finally {
                     btn.disabled = false;
                 }
@@ -482,7 +497,7 @@
                 if (!data || !data.names || data.names.length === 0) { hideLikersTooltip(); return; }
 
                 const extra = data.total - data.names.length;
-                const lines = extra > 0 ? [...data.names, `og ${extra} andre`] : data.names;
+                const lines = extra > 0 ? [...data.names, `${@TJs("og")} ${extra} ${@TJs("andre")}`] : data.names;
                 likersTooltip.textContent = lines.join('\n');
                 likersTooltip.classList.add('is-visible');
                 positionLikersTooltip(btn);
@@ -529,7 +544,7 @@
                 const beforeId = btn.dataset.beforeId;
                 const wrap = btn.closest('.feed-load-more-wrap');
                 btn.disabled = true;
-                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Indlæser...';
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> ${@TJs("Indlæser...")}`;
                 try {
                     const res = await fetch(`/Feed/LoadMore?beforeId=${encodeURIComponent(beforeId)}`, { headers: { 'X-Requested-With': 'fetch' } });
                     if (!res.ok) return;
@@ -541,7 +556,7 @@
                     formatTimes(feedList);
                     scanForPendingTranslations(feedList);
                 } catch {
-                    window.FvToast.show('error', 'Netværksfejl. Prøv igen.');
+                    window.FvToast.show('error', @TJs("Netværksfejl. Prøv igen."));
                 }
             };
 
@@ -559,7 +574,7 @@
                 const mediaId = tile.dataset.mediaId;
                 lightboxContent.innerHTML = tile.classList.contains('feed-media-video')
                     ? `<video src="/Feed/Media/${mediaId}" controls autoplay class="feed-lightbox-media"></video>`
-                    : `<img src="/Feed/Media/${mediaId}" class="feed-lightbox-media" alt="Billede" />`;
+                    : `<img src="/Feed/Media/${mediaId}" class="feed-lightbox-media" alt="${@TJs("Billede")}" />`;
                 const showNav = lightboxItems.length > 1;
                 lightboxPrev.style.visibility = showNav ? 'visible' : 'hidden';
                 lightboxNext.style.visibility = showNav ? 'visible' : 'hidden';
@@ -607,8 +622,8 @@
             const confirmDelete = (type, id) => {
                 pendingDelete = { type, id };
                 confirmText.textContent = type === 'post'
-                    ? 'Er du sikker på, at du vil slette dette opslag? Billeder, videoer og kommentarer forsvinder også.'
-                    : 'Er du sikker på, at du vil slette denne kommentar?';
+                    ? @TJs("Er du sikker på, at du vil slette dette opslag? Billeder, videoer og kommentarer forsvinder også.")
+                    : @TJs("Er du sikker på, at du vil slette denne kommentar?");
                 bsConfirmModal.show();
             };
 
@@ -649,7 +664,7 @@
                         }
                     }
                 } catch {
-                    window.FvToast.show('error', 'Netværksfejl. Prøv igen.');
+                    window.FvToast.show('error', @TJs("Netværksfejl. Prøv igen."));
                 } finally {
                     confirmBtn.disabled = false;
                     bsConfirmModal.hide();
@@ -678,7 +693,7 @@
                 const res = await fetch(`/Feed/EditPostData/${postId}`, { headers: { 'X-Requested-With': 'fetch' } });
                 const data = await res.json();
                 if (!data.success) {
-                    window.FvToast.show(data.type || 'error', data.message || 'Opslaget kunne ikke hentes.');
+                    window.FvToast.show(data.type || 'error', data.message || @TJs("Opslaget kunne ikke hentes."));
                     return;
                 }
 
@@ -724,7 +739,7 @@
                         }
                     }
                 } catch {
-                    window.FvToast.show('error', 'Netværksfejl. Prøv igen.');
+                    window.FvToast.show('error', @TJs("Netværksfejl. Prøv igen."));
                 } finally {
                     editSaveBtn.disabled = false;
                 }

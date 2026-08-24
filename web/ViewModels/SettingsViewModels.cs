@@ -20,6 +20,20 @@ namespace web.ViewModels
         public bool ShowSmsTab { get; set; }
     }
 
+    /// <summary>One row in the Settings → Sprog table — see SettingsController.LanguagesTabContent and IUiTranslationBulkService.GetProgressOverviewAsync.</summary>
+    public class LanguageProgressViewModel
+    {
+        public string LanguageCode { get; set; } = string.Empty;
+        public string NativeName { get; set; } = string.Empty;
+        public int TranslatedCount { get; set; }
+        public int TotalCount { get; set; }
+        public int PercentComplete { get; set; }
+        public bool IsRunning { get; set; }
+        public int RunningCompleted { get; set; }
+        public int RunningTotal { get; set; }
+        public bool IsInstalled { get; set; }
+    }
+
     public class UserListItemViewModel
     {
         public string Id { get; set; } = string.Empty;
