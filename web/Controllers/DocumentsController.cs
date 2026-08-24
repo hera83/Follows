@@ -272,6 +272,22 @@ namespace web.Controllers
             {
                 using var scope = _scopeFactory.CreateScope();
                 var documentsService = scope.ServiceProvider.GetRequiredService<IDocumentsService>();
+                // Resolved from this task's own scope, not the controller's injected field — the
+                // controller's request scope is disposed as soon as TranslateStart returns, same reasoning
+                // as documentsService above.
+                var toastTranslator = scope.ServiceProvider.GetRequiredService<IToastTranslationService>();
+                var targetLanguage = AppLanguages.Normalize(preferredLanguage);
+
+                // Translates a hard-coded Danish failure message to the viewer's profile language, same as
+                // TranslateDocumentAsync already does for its own success-path messages (see
+                // TranslateDocumentResponseDto.Message) — a message read out of `job.ErrorMessage` by
+                // TranslateStatus has no {success, message, type}-shaped JSON response for
+                // ToastTranslationFilter to intercept, so without this it would always show up in Danish
+                // regardless of the viewer's profile language (that was the earlier "already in target
+                // language" bug for exactly the same reason - see git history for the fix).
+                // CancellationToken.None, not cts.Token — this can run from the OperationCanceledException
+                // branch below, i.e. exactly when cts.Token is already cancelled.
+                Task<string> Localize(string danishText) => toastTranslator.TranslateAsync(danishText, targetLanguage, CancellationToken.None);
 
                 // Hard upper bound so a stuck/very slow AI Gateway call eventually releases TranslationSlot
                 // instead of blocking every other document translation behind it forever — a background job
@@ -298,7 +314,7 @@ namespace web.Controllers
 
                         if (!result.Success)
                         {
-                            _translationJobs.Fail(jobId, result.ErrorMessage ?? "Oversættelsen mislykkedes.");
+                            _translationJobs.Fail(jobId, await Localize(result.ErrorMessage ?? "Oversættelsen mislykkedes."));
                             return;
                         }
 
@@ -309,6 +325,7 @@ namespace web.Controllers
                             job.TargetLanguageName = result.TargetLanguageName;
                             job.Html = result.Html;
                             job.Truncated = result.Truncated;
+                            job.Message = result.Message;
                         });
                     }
                     finally
@@ -321,7 +338,7 @@ namespace web.Controllers
                     _logger.LogWarning(
                         "Document translation job {JobId} for document {DocumentId} timed out after {Minutes} minutes",
                         jobId, id, DocumentLimits.TranslationJobTimeoutMinutes);
-                    _translationJobs.Fail(jobId, "Oversættelsen tog for lang tid og blev afbrudt. Prøv igen senere.");
+                    _translationJobs.Fail(jobId, await Localize("Oversættelsen tog for lang tid og blev afbrudt. Prøv igen senere."));
                 }
                 catch (Exception ex)
                 {
@@ -329,7 +346,7 @@ namespace web.Controllers
                     // Success:false instead of throwing. Caught here anyway so a genuinely unexpected bug
                     // doesn't leave the job stuck at "running" forever with the client polling indefinitely.
                     _logger.LogError(ex, "Unexpected failure in background translation of document {DocumentId}", id);
-                    _translationJobs.Fail(jobId, "Oversættelsen mislykkedes. Prøv igen senere.");
+                    _translationJobs.Fail(jobId, await Localize("Oversættelsen mislykkedes. Prøv igen senere."));
                 }
             });
 
@@ -361,7 +378,12 @@ namespace web.Controllers
                 alreadyInTargetLanguage = job.AlreadyInTargetLanguage,
                 targetLanguageName = job.TargetLanguageName,
                 html = job.Html,
-                truncated = job.Truncated
+                truncated = job.Truncated,
+                // Already translated to the viewer's profile language (see TranslateDocumentResponseDto.
+                // Message and the Fail(...) calls in TranslateStart above) — the client shows this as-is
+                // instead of building its own Danish toast text, which is what let this response's shape
+                // slip past ToastTranslationFilter in the first place (no {success, message, type}).
+                message = job.Message
             });
         }
 

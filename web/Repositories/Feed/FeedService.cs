@@ -18,6 +18,7 @@ namespace web.Repositories.Feed
         private readonly IConfiguration _config;
         private readonly ILogger<FeedService> _logger;
         private readonly LanguageTools _language;
+        private readonly IAiGatewayConfigurationProvider _aiGatewayConfigurationProvider;
 
         public FeedService(
             ApplicationDbContext context,
@@ -32,6 +33,19 @@ namespace web.Repositories.Feed
             _config = config;
             _logger = logger;
             _language = aiGatewayService.Language(aiGatewayConfigurationProvider);
+            _aiGatewayConfigurationProvider = aiGatewayConfigurationProvider;
+        }
+
+        // Overrides DefaultChatModel with AiGateway:TranslationModel when one is configured — see
+        // AiGatewaySettings.TranslationModel for why: DefaultChatModel is sometimes a reasoning model,
+        // which turned out (confirmed by live testing, originally against the Documents "Oversæt"-button)
+        // to be unreliable and slow for translation, silently spending its whole token budget on hidden
+        // reasoning instead of ever answering. Resolved once per call site rather than cached on the
+        // instance, since FeedService is scoped per-request and the setting can change between requests.
+        private async Task<string?> ResolveTranslationModelAsync(CancellationToken ct)
+        {
+            var aiConfig = await _aiGatewayConfigurationProvider.GetActiveConfigurationAsync(ct);
+            return string.IsNullOrWhiteSpace(aiConfig.TranslationModel) ? null : aiConfig.TranslationModel;
         }
 
         public async Task<GetFeedPageResponseDto> GetFeedPageAsync(GetFeedPageRequestDto dto, CancellationToken ct = default)
@@ -674,7 +688,8 @@ namespace web.Repositories.Feed
             {
                 var sourceNative = AppLanguages.GetNativeName(sourceLanguageCode);
                 var targetNative = AppLanguages.GetNativeName(targetLanguageCode);
-                var translated = await _language.TranslateAsync(text, targetNative, sourceNative, cancellationToken: ct);
+                var model = await ResolveTranslationModelAsync(ct);
+                var translated = await _language.TranslateAsync(text, targetNative, sourceNative, model: model, cancellationToken: ct);
                 return string.IsNullOrWhiteSpace(translated) ? null : translated;
             }
             catch (Exception ex)
@@ -760,7 +775,8 @@ namespace web.Repositories.Feed
 
             try
             {
-                return await _language.DetectLanguageCodeAsync(text, cancellationToken: ct);
+                var model = await ResolveTranslationModelAsync(ct);
+                return await _language.DetectLanguageCodeAsync(text, model: model, cancellationToken: ct);
             }
             catch (Exception ex)
             {

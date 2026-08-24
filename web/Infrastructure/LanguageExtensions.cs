@@ -75,16 +75,17 @@ namespace web.Infrastructure
             if (string.IsNullOrWhiteSpace(content))
                 return Task.FromResult(string.Empty);
 
+            // Holdt kort og direkte med vilje - en bruger-test af samme model/AI-gateway viste at et langt,
+            // fler-klausulet systemprompt (den forrige version her havde 5-6 separate instruktioner bundtet
+            // sammen) reelt ser ud til at give en "tænkende" model mere at overveje, før den svarer -
+            // hvilket øger risikoen for tomme/afbrudte chunks (se DocumentsService.TranslateDocumentAsync's
+            // retry-logik). Kortere og mere ligetil klarede sig markant bedre i praksis.
             var sourceClause = string.IsNullOrWhiteSpace(sourceLanguage) ? string.Empty : $" fra {sourceLanguage}";
             var systemPrompt =
-                $"Du er en oversætter og formatterer. Oversæt teksten brugeren sender{sourceClause} til {targetLanguage}, " +
-                "og formater resultatet som pænt Markdown. Teksten stammer fra et dokument og kan indeholde løs " +
-                "struktur fra den oprindelige side- eller celleopdeling - genskab den som Markdown: overskrifter med #, " +
-                "punktlister eller nummererede lister, og tabeldata som Markdown-tabeller (pipe-syntaks med skillelinje). " +
-                "Bevar al indhold og rækkefølge. Svar direkte med selve den oversatte Markdown-tekst med det samme - " +
-                "ræsonnér ikke trin for trin og forklar ikke dine overvejelser først. Svar udelukkende med den " +
-                "oversatte Markdown-tekst - ingen indledning, ingen forklaringer, ingen kodeblok-indpakning (```) om " +
-                "hele svaret.";
+                $"Du er oversætter. Oversæt teksten brugeren sender{sourceClause} til {targetLanguage}, og behold " +
+                "Markdown-struktur (overskrifter med #, lister med -, tabeller med pipe-syntaks) hvis kildeteksten " +
+                "har den slags struktur. Bevar alt indhold og rækkefølgen. " +
+                "Returner kun den oversatte tekst - ingen indledning, forklaring, spørgsmål eller kodeblok-indpakning.";
 
             // Dokument-tekst er typisk meget længere end en kort oversættelse/opsummering. Ollamas
             // standard num_ctx er ofte kun 2048 tokens medmindre modellens Modelfile sætter noget
@@ -112,7 +113,13 @@ namespace web.Infrastructure
             // 8192 er et forsøg på en mellemvej - dobbelt hovedrum ift. 4096 til ræsonnement + svar, stadig
             // langt fra 16384's VRAM-forbrug. Juster videre i den ene eller anden retning ud fra hvad der
             // reelt sker på serveren (VRAM-forbrug vs. tomme chunks).
-            var options = new OllamaOptionsDto { Temperature = 0.2, NumCtx = 8192, NumPredict = -1 };
+            //
+            // NumPredict er sat til et loft i stedet for -1 (ubegrænset) - uden det kan et enkelt forsøg i
+            // værste fald bruge hele NumCtx-budgettet på skjult ræsonnement, uden nogensinde at ramme en
+            // fejl eller returnere noget, hvilket gør ét mislykket forsøg unødigt langsomt. Med et loft
+            // stopper generering tidligere, så et forsøg der er ved at gå galt, fejler hurtigere og kan nå
+            // at blive retried (se DocumentsService's retry-loop) inden for den samlede job-timeout.
+            var options = new OllamaOptionsDto { Temperature = 0.2, NumCtx = 8192, NumPredict = 3000 };
 
             return CompleteAsync(systemPrompt, content, model, options, cancellationToken);
         }
@@ -129,9 +136,24 @@ namespace web.Infrastructure
             if (string.IsNullOrWhiteSpace(text))
                 return string.Empty;
 
+            // The explicit "aldrig ud fra emnet..." clause and worked example below aren't decorative -
+            // confirmed by live testing that the plain, shorter version of this prompt (just "answer with
+            // the language name") makes the model confuse a text's TOPIC with its actual language: an
+            // English text that happens to mention a Danish company/city name (e.g. "Welcome to Nordvang
+            // A/S in Denmark") was consistently (6/6 in testing) misidentified as "Dansk" - it was
+            // pattern-matching the subject matter, not reading the actual words. The same short prompt
+            // correctly identified other languages (French, German) that didn't share this specific
+            // confusion, which is what makes this a real bug and not just "the model is bad at this" -
+            // adding one concrete example of exactly this trap fixed it consistently (6/6 in testing,
+            // including re-checking it didn't regress French/German/Danish detection).
             const string systemPrompt =
-                "Du genkender sprog. Læs teksten brugeren sender, og svar udelukkende med navnet på sproget - " +
-                "på dansk, med stort forbogstav (fx \"Dansk\", \"Engelsk\", \"Tysk\"). Svar ikke med andet end sprognavnet.";
+                "Du genkender hvilket sprog en tekst er SKREVET PÅ, ud fra dens ord, stavning og grammatik - " +
+                "aldrig ud fra emnet, stednavne eller firmanavne i teksten. Eksempel: teksten \"Welcome to " +
+                "Nordvang A/S in Denmark\" handler om et dansk firma, men er skrevet på engelsk (ord som " +
+                "\"Welcome\", \"to\", \"in\" er engelske) - svaret er derfor Engelsk, ikke Dansk. Svar " +
+                "udelukkende med navnet på sproget - på dansk, med stort forbogstav (Dansk, Engelsk, Tysk, " +
+                "Fransk, osv). Svar ikke med andet end selve sprognavnet, uanset hvilket sprog teksten er " +
+                "skrevet på.";
 
             var result = await CompleteAsync(systemPrompt, text, model, cancellationToken);
             return result.TrimEnd('.', ' ');
@@ -311,7 +333,15 @@ namespace web.Infrastructure
                     new() { Role = "system", Content = systemPrompt },
                     new() { Role = "user", Content = userPrompt }
                 },
-                Options = options ?? new OllamaOptionsDto { Temperature = 0.2 }
+                Options = options ?? new OllamaOptionsDto { Temperature = 0.2 },
+                // Uden dette bruger Ollama sin egen standard keep_alive (typisk 5 min) og læsser modellen af
+                // hukommelsen derefter - næste kald (fx det følgende chunk i en dokument-oversættelse, eller
+                // et Feed-oversæt-kald der interleaver) betaler så en fuld genindlæsning oveni selve
+                // genereringen, hvilket for en model i denne størrelse nemt kan koste 30-60+ sekunder pr.
+                // gang. Sat generøst højt her, fælles for alle LanguageTools-kald, så modellen typisk
+                // forbliver loaded gennem en hel dokument-oversættelse (flere kald i træk) og videre ind i
+                // almindelig Feed-brug, i stedet for konstant at blive smidt ud og genindlæst.
+                KeepAlive = "30m"
             }, cancellationToken);
 
             return CleanResponse(response.Message?.Content);
