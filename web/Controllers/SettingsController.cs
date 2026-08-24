@@ -1011,6 +1011,19 @@ namespace web.Controllers
             filter.TotalCount = filtered.Count;
             filter.Users = filtered.Skip((filter.Page - 1) * filter.PageSize).Take(filter.PageSize).ToList();
 
+            // "Foretrukket sprog"-dropdownen i opret/rediger-bruger skal ligesom Min Profil kun tilbyde
+            // installerede sprog - men enhver bruger, der allerede står på et sprog der siden er
+            // afinstalleret, skal stadig kunne vises/redigeres korrekt (se ProfileController.Index for
+            // samme sikkerhedsnet, generaliseret her til "alle brugere" i stedet for "den nuværende bruger").
+            var installedLanguages = (await _uiTranslationBulkService.GetInstalledLanguagesAsync(HttpContext.RequestAborted)).ToList();
+            var installedCodes = installedLanguages.Select(l => l.Code).ToHashSet();
+            foreach (var code in items.Select(u => AppLanguages.Normalize(u.PreferredLanguage)).Distinct())
+            {
+                if (installedCodes.Add(code))
+                    installedLanguages.Add((code, AppLanguages.GetNativeName(code)));
+            }
+            filter.InstalledLanguages = installedLanguages;
+
             return filter;
         }
 

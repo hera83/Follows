@@ -56,6 +56,14 @@ namespace web.ViewModels
         public List<UserListItemViewModel> Users { get; set; } = new();
         public int TotalCount { get; set; }
         public string? CurrentUserId { get; set; }
+
+        /// <summary>
+        /// Options for the "Foretrukket sprog" dropdown in the opret/rediger-bruger modaler — installed
+        /// languages (see IUiTranslationBulkService.GetInstalledLanguagesAsync) plus any language a listed
+        /// user is already on, even if it was later uninstalled, so opening "Rediger" for that user never
+        /// silently shows/saves the wrong language. Same reasoning as ProfileViewModel.InstalledLanguages.
+        /// </summary>
+        public List<(string Code, string NativeName)> InstalledLanguages { get; set; } = new();
     }
 
     public class CreateUserViewModel

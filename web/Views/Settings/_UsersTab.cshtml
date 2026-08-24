@@ -93,7 +93,7 @@
                         <div class="col-md-12">
                             <label class="form-label">Foretrukket sprog</label>
                             <select name="PreferredLanguage" class="form-select">
-                                @foreach (var lang in AppLanguages.All)
+                                @foreach (var lang in Model.InstalledLanguages)
                                 {
                                     <option value="@lang.Code" selected="@(lang.Code == AppLanguages.Default)">@lang.NativeName</option>
                                 }
@@ -162,7 +162,7 @@
                         <div class="col-md-12">
                             <label class="form-label">Foretrukket sprog</label>
                             <select name="PreferredLanguage" id="editUserPreferredLanguage" class="form-select">
-                                @foreach (var lang in AppLanguages.All)
+                                @foreach (var lang in Model.InstalledLanguages)
                                 {
                                     <option value="@lang.Code">@lang.NativeName</option>
                                 }
