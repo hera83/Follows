@@ -4,8 +4,8 @@
 
 <div>
     <div class="page-header">
-        <h1><i class="bi bi-person-circle me-2"></i>Min Profil</h1>
-        <p>Administrer dine personlige oplysninger og profilbillede</p>
+        <h1><i class="bi bi-person-circle me-2"></i>@T("Min Profil")</h1>
+        <p>@T("Administrer dine personlige oplysninger og profilbillede")</p>
     </div>
 
     <div class="d-flex flex-column gap-4">
@@ -13,7 +13,7 @@
         <!-- Profilbillede -->
         <div class="card">
             <div class="card-header">
-                <i class="bi bi-image"></i> Profilbillede
+                <i class="bi bi-image"></i> @T("Profilbillede")
             </div>
             <div class="card-body">
                 <div class="d-flex flex-column flex-sm-row align-items-center gap-4">
@@ -23,7 +23,7 @@
                             <img id="currentAvatar"
                                  src="@Url.Action("Avatar", "Profile")"
                                  class="profile-avatar"
-                                 alt="Profilbillede" />
+                                 alt="@T("Profilbillede")" />
                         }
                         else
                         {
@@ -34,16 +34,16 @@
                     </div>
                     <div class="flex-grow-1">
                         <p class="text-muted small mb-3">
-                            Upload et billede som bruges som dit profilikon i menuen.<br />
-                            Billedet beskæres automatisk til cirkulær form (256 × 256 px).<br />
-                            Understøttede formater: JPEG, PNG, WebP &mdash; max 5 MB.
+                            @T("Upload et billede som bruges som dit profilikon i menuen.")<br />
+                            @T("Billedet beskæres automatisk til cirkulær form (256 × 256 px).")<br />
+                            @T("Understøttede formater: JPEG, PNG, WebP — max 5 MB.")
                         </p>
                         <div class="d-flex flex-wrap gap-2" id="avatarActionButtons">
                             <button type="button" class="btn btn-secondary" id="btnSelectImage">
-                                <i class="bi bi-upload me-1"></i> Upload billede
+                                <i class="bi bi-upload me-1"></i> @T("Upload billede")
                             </button>
                             <button type="button" class="btn btn-secondary" id="btnCaptureImage">
-                                <i class="bi bi-camera me-1"></i> Tag billede
+                                <i class="bi bi-camera me-1"></i> @T("Tag billede")
                             </button>
                             @if (Model.HasAvatar)
                             {
@@ -51,7 +51,7 @@
                                     @Html.AntiForgeryToken()
                                     <button type="button" class="btn btn-danger"
                                             data-bs-toggle="modal" data-bs-target="#fjernBilledeModal">
-                                        <i class="bi bi-trash me-1"></i> Fjern billede
+                                        <i class="bi bi-trash me-1"></i> @T("Fjern billede")
                                     </button>
                                 </form>
                             }
@@ -65,11 +65,11 @@
         <!-- Tema -->
         <div class="card">
             <div class="card-header">
-                <i class="bi bi-palette"></i> Tema
+                <i class="bi bi-palette"></i> @T("Tema")
             </div>
             <div class="card-body">
                 <p class="text-muted small mb-3">
-                    Vælg dit foretrukne farvetema. <strong>System</strong> følger automatisk din enheds lyse/mørke indstilling.
+                    @T("Vælg dit foretrukne farvetema.") <strong>@T("System")</strong> @T("følger automatisk din enheds lyse/mørke indstilling.")
                 </p>
                 <form asp-action="SetTheme" method="post" id="themeForm">
                     @Html.AntiForgeryToken()
@@ -78,19 +78,19 @@
                             <input type="radio" name="themePreference" value="@ThemeMode.System"
                                    @(Model.ThemePreference == ThemeMode.System ? "checked" : "") />
                             <i class="bi bi-circle-half"></i>
-                            <span>System</span>
+                            <span>@T("System")</span>
                         </label>
                         <label class="theme-option @(Model.ThemePreference == ThemeMode.Light ? "active" : "")">
                             <input type="radio" name="themePreference" value="@ThemeMode.Light"
                                    @(Model.ThemePreference == ThemeMode.Light ? "checked" : "") />
                             <i class="bi bi-sun"></i>
-                            <span>Lys</span>
+                            <span>@T("Lys")</span>
                         </label>
                         <label class="theme-option @(Model.ThemePreference == ThemeMode.Dark ? "active" : "")">
                             <input type="radio" name="themePreference" value="@ThemeMode.Dark"
                                    @(Model.ThemePreference == ThemeMode.Dark ? "checked" : "") />
                             <i class="bi bi-moon-stars"></i>
-                            <span>Mørk</span>
+                            <span>@T("Mørk")</span>
                         </label>
                     </div>
                 </form>
@@ -100,7 +100,7 @@
         <!-- Oplysninger -->
         <div class="card">
             <div class="card-header">
-                <i class="bi bi-pencil-square"></i> Oplysninger
+                <i class="bi bi-pencil-square"></i> @T("Oplysninger")
             </div>
             <div class="card-body">
                 <form asp-action="Edit" method="post" id="profileEditForm">
@@ -108,32 +108,32 @@
 
                     <div class="row g-4">
                         <div class="col-12 col-md-6">
-                            <label asp-for="EditForm.DisplayName" class="form-label"></label>
+                            <label asp-for="EditForm.DisplayName" class="form-label">@T("Visningsnavn")</label>
                             <input asp-for="EditForm.DisplayName" class="form-control" autocomplete="name" />
                             <span asp-validation-for="EditForm.DisplayName" class="field-validation-error"></span>
                         </div>
                         <div class="col-12 col-md-6">
-                            <label asp-for="EditForm.UserName" class="form-label"></label>
+                            <label asp-for="EditForm.UserName" class="form-label">@T("Brugernavn")</label>
                             <input asp-for="EditForm.UserName" class="form-control" autocomplete="username"
-                                   placeholder="Ikke sat – email bruges ved login" />
-                            <div class="form-text text-muted">Bruges til at logge ind. Skal være unikt.</div>
+                                   placeholder="@T("Ikke sat – email bruges ved login")" />
+                            <div class="form-text text-muted">@T("Bruges til at logge ind. Skal være unikt.")</div>
                             <span asp-validation-for="EditForm.UserName" class="field-validation-error"></span>
                         </div>
                         <div class="col-12 col-md-6">
-                            <label class="form-label">Email</label>
+                            <label class="form-label">@T("Email")</label>
                             <input type="text" class="form-control form-control-plaintext-styled"
                                    value="@Model.Email" readonly tabindex="-1" />
-                            <div class="form-text text-muted">Email kan ikke ændres her.</div>
+                            <div class="form-text text-muted">@T("Email kan ikke ændres her.")</div>
                         </div>
                         <div class="col-12 col-md-6">
-                            <label asp-for="EditForm.PhoneNumber" class="form-label"></label>
+                            <label asp-for="EditForm.PhoneNumber" class="form-label">@T("Telefonnummer")</label>
                             <input asp-for="EditForm.PhoneNumber" class="form-control" autocomplete="tel" />
                             <span asp-validation-for="EditForm.PhoneNumber" class="field-validation-error"></span>
                         </div>
                         <div class="col-12 col-md-6">
-                            <label asp-for="EditForm.PreferredLanguage" class="form-label"></label>
+                            <label asp-for="EditForm.PreferredLanguage" class="form-label">@T("Foretrukket sprog")</label>
                             <select asp-for="EditForm.PreferredLanguage" class="form-select">
-                                @foreach (var lang in AppLanguages.All)
+                                @foreach (var lang in Model.InstalledLanguages)
                                 {
                                     <option value="@lang.Code" selected="@(lang.Code == Model.EditForm.PreferredLanguage)">@lang.NativeName</option>
                                 }
@@ -144,16 +144,16 @@
 
                     <hr class="my-4" />
 
-                    <p class="text-muted small mb-3">Udfyld kun nedenstående felter, hvis du vil ændre dit kodeord.</p>
+                    <p class="text-muted small mb-3">@T("Udfyld kun nedenstående felter, hvis du vil ændre dit kodeord.")</p>
 
                     <div class="row g-3">
                         <div class="col-12 col-md-6">
-                            <label asp-for="EditForm.NewPassword" class="form-label"></label>
+                            <label asp-for="EditForm.NewPassword" class="form-label">@T("Nyt kodeord")</label>
                             <input asp-for="EditForm.NewPassword" class="form-control" autocomplete="new-password" />
                             <span asp-validation-for="EditForm.NewPassword" class="field-validation-error"></span>
                         </div>
                         <div class="col-12 col-md-6">
-                            <label asp-for="EditForm.ConfirmNewPassword" class="form-label"></label>
+                            <label asp-for="EditForm.ConfirmNewPassword" class="form-label">@T("Bekræft nyt kodeord")</label>
                             <input asp-for="EditForm.ConfirmNewPassword" class="form-control" autocomplete="new-password" />
                             <span asp-validation-for="EditForm.ConfirmNewPassword" class="field-validation-error"></span>
                         </div>
@@ -161,7 +161,7 @@
 
                     <div class="mt-4">
                         <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-floppy2 me-1"></i> Gem
+                            <i class="bi bi-floppy2 me-1"></i> @T("Gem")
                         </button>
                     </div>
                 </form>
@@ -177,9 +177,9 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="cameraModalLabel">
-                    <i class="bi bi-camera me-2"></i>Tag billede
+                    <i class="bi bi-camera me-2"></i>@T("Tag billede")
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Luk")"></button>
             </div>
             <div class="modal-body p-0 position-relative" style="background:#000;">
                 <video id="cameraVideo" autoplay playsinline muted
@@ -188,14 +188,14 @@
             </div>
             <div class="modal-footer justify-content-between">
                 <button type="button" class="btn btn-outline-secondary" id="btnSwitchCamera">
-                    <i class="bi bi-arrow-repeat me-1"></i> Skift kamera
+                    <i class="bi bi-arrow-repeat me-1"></i> @T("Skift kamera")
                 </button>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        <i class="bi bi-x-lg me-1"></i> Annuller
+                        <i class="bi bi-x-lg me-1"></i> @T("Annuller")
                     </button>
                     <button type="button" class="btn btn-primary" id="btnTakePhoto">
-                        <i class="bi bi-camera me-1"></i> Tag billede
+                        <i class="bi bi-camera me-1"></i> @T("Tag billede")
                     </button>
                 </div>
             </div>
@@ -209,21 +209,21 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="cropModalLabel">
-                    <i class="bi bi-crop me-2"></i>Beskær profilbillede
+                    <i class="bi bi-crop me-2"></i>@T("Beskær profilbillede")
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Luk")"></button>
             </div>
             <div class="modal-body">
                 <div class="crop-container">
-                    <img id="cropImage" src="" alt="Beskær billede" style="max-width:100%;" />
+                    <img id="cropImage" src="" alt="@T("Beskær billede")" style="max-width:100%;" />
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="bi bi-x-lg me-1"></i> Annuller
+                    <i class="bi bi-x-lg me-1"></i> @T("Annuller")
                 </button>
                 <button type="button" class="btn btn-primary" id="btnConfirmCrop">
-                    <i class="bi bi-floppy2 me-1"></i> Gem billede
+                    <i class="bi bi-floppy2 me-1"></i> @T("Gem billede")
                 </button>
             </div>
         </div>
@@ -236,19 +236,19 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="fjernBilledeModalLabel">
-                    <i class="bi bi-trash me-2"></i>Fjern profilbillede
+                    <i class="bi bi-trash me-2"></i>@T("Fjern profilbillede")
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Luk")"></button>
             </div>
             <div class="modal-body">
-                Er du sikker på, at du vil fjerne dit profilbillede?
+                @T("Er du sikker på, at du vil fjerne dit profilbillede?")
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="bi bi-x-lg me-1"></i> Annuller
+                    <i class="bi bi-x-lg me-1"></i> @T("Annuller")
                 </button>
                 <button type="button" class="btn btn-danger" id="btnConfirmFjernBillede">
-                    <i class="bi bi-trash me-1"></i> Fjern billede
+                    <i class="bi bi-trash me-1"></i> @T("Fjern billede")
                 </button>
             </div>
         </div>
@@ -261,14 +261,14 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="beskedModalLabel">
-                    <i class="bi bi-exclamation-circle me-2"></i>Besked
+                    <i class="bi bi-exclamation-circle me-2"></i>@T("Besked")
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Luk")"></button>
             </div>
             <div class="modal-body" id="beskedModalBody"></div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="bi bi-x-lg me-1"></i> Luk
+                    <i class="bi bi-x-lg me-1"></i> @T("Luk")
                 </button>
             </div>
         </div>
@@ -312,6 +312,12 @@
                 const data = await window.FvForm.submit(profileEditForm);
                 if (submitBtn) submitBtn.disabled = false;
                 if (data.success) {
+                    // A language change with a real UI-catalog gap sends the viewer to the "siden
+                    // oversættes" wait page instead of just showing the toast - see ProfileController.Edit.
+                    if (data.redirectToWaitPage && data.waitUrl) {
+                        window.location.href = data.waitUrl;
+                        return;
+                    }
                     profileEditForm.querySelector('[name="EditForm.NewPassword"]').value = '';
                     profileEditForm.querySelector('[name="EditForm.ConfirmNewPassword"]').value = '';
                 }
@@ -335,13 +341,13 @@
             function setAvatarUI(hasAvatar) {
                 const cacheBust = `?v=${Date.now()}`;
                 document.getElementById('currentAvatarWrapper').innerHTML = hasAvatar
-                    ? `<img id="currentAvatar" src="/Profile/Avatar${cacheBust}" class="profile-avatar" alt="Profilbillede" />`
+                    ? `<img id="currentAvatar" src="/Profile/Avatar${cacheBust}" class="profile-avatar" alt="${@TJs("Profilbillede")}" />`
                     : `<div id="currentAvatar" class="profile-avatar-placeholder"><i class="bi bi-person-circle"></i></div>`;
 
                 const sidebarAvatar = document.getElementById('sidebarAvatarWrapper');
                 if (sidebarAvatar) {
                     sidebarAvatar.innerHTML = hasAvatar
-                        ? `<img src="/Profile/Avatar${cacheBust}" class="menu-avatar" alt="Profilbillede" />`
+                        ? `<img src="/Profile/Avatar${cacheBust}" class="menu-avatar" alt="${@TJs("Profilbillede")}" />`
                         : '<i class="bi bi-person-circle"></i>';
                 }
 
@@ -353,7 +359,7 @@
                         <form action="/Profile/DeleteAvatar" method="post" id="fjernBilledeForm">
                             <input name="__RequestVerificationToken" type="hidden" value="${token}" />
                             <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#fjernBilledeModal">
-                                <i class="bi bi-trash me-1"></i> Fjern billede
+                                <i class="bi bi-trash me-1"></i> ${@TJs("Fjern billede")}
                             </button>
                         </form>
                     `);
@@ -400,7 +406,7 @@
             btnConfirm.addEventListener('click', () => {
                 if (!cropper) return;
                 btnConfirm.disabled = true;
-                btnConfirm.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Gemmer...';
+                btnConfirm.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> ${@TJs("Gemmer...")}`;
                 cropper.getCroppedCanvas({ width: 256, height: 256 }).toBlob(async (blob) => {
                     const formData = new FormData();
                     formData.append('croppedImage', blob, 'avatar.jpg');
@@ -411,13 +417,13 @@
                         if (res.ok) {
                             bsCropModal.hide();
                             setAvatarUI(true);
-                            window.FvToast.show('success', 'Profilbillede opdateret.');
+                            window.FvToast.show('success', @TJs("Profilbillede opdateret."));
                         }
-                        else { const data = await res.json().catch(() => ({})); showAlert(data.error || 'Upload fejlede.'); }
-                    } catch { showAlert('Netværksfejl.'); }
+                        else { const data = await res.json().catch(() => ({})); showAlert(data.error || @TJs("Upload fejlede.")); }
+                    } catch { showAlert(@TJs("Netværksfejl.")); }
                     finally {
                         btnConfirm.disabled = false;
-                        btnConfirm.innerHTML = '<i class="bi bi-check-lg me-1"></i> Gem billede';
+                        btnConfirm.innerHTML = `<i class="bi bi-check-lg me-1"></i> ${@TJs("Gem billede")}`;
                     }
                 }, 'image/jpeg', 0.92);
             });
@@ -428,7 +434,7 @@
             fileInput.addEventListener('change', (e) => {
                 const file = e.target.files[0]; fileInput.value = '';
                 if (!file) return;
-                if (file.size > 5 * 1024 * 1024) { showAlert('Max 5 MB.'); return; }
+                if (file.size > 5 * 1024 * 1024) { showAlert(@TJs("Max 5 MB.")); return; }
                 const reader = new FileReader();
                 reader.onload = (ev) => openCropper(ev.target.result);
                 reader.readAsDataURL(file);
@@ -471,7 +477,7 @@
                     const c = deviceId ? { video: { deviceId: { exact: deviceId } } } : { video: { facingMode: 'user' } };
                     activeStream = await navigator.mediaDevices.getUserMedia(c);
                     videoEl.srcObject = activeStream;
-                } catch (err) { showAlert('Kamera fejl: ' + err.message); bsCameraModal.hide(); }
+                } catch (err) { showAlert(@TJs("Kamera fejl:") + ' ' + err.message); bsCameraModal.hide(); }
             }
 
             cameraModalEl.addEventListener('shown.bs.modal', () => startCamera(cameras[currentCamIdx]?.deviceId));

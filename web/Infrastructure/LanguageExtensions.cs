@@ -125,6 +125,67 @@ namespace web.Infrastructure
         }
 
         /// <summary>
+        /// Oversætter en liste af korte, uafhængige tekster (fx UI-labels/knapper — se
+        /// UiTranslationBulkService) til <paramref name="targetLanguage"/> i ét AI Gateway-kald i stedet
+        /// for ét kald pr. streng, ved at sende og modtage en nummereret liste. Returnerer null hvis
+        /// svaret ikke kunne parses til præcis <c>texts.Count</c> linjer i rækkefølge — bevidst en
+        /// alt-eller-intet-kontrakt: en delvist forkert parset batch (fx forskudt rækkefølge) ville binde
+        /// den forkerte oversættelse til den forkerte kildetekst, hvilket er værre end at droppe hele
+        /// batchen og prøve igen senere (se UiTranslationBulkService's fallback-håndtering).
+        /// </summary>
+        public async Task<IReadOnlyList<string>?> TranslateBatchAsync(
+            IReadOnlyList<string> texts,
+            string targetLanguage,
+            string? sourceLanguage = null,
+            string? model = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (texts.Count == 0) return Array.Empty<string>();
+
+            var sourceClause = string.IsNullOrWhiteSpace(sourceLanguage) ? string.Empty : $" fra {sourceLanguage}";
+            var systemPrompt =
+                $"Du er oversætter. Du får en nummereret liste med korte UI-tekster{sourceClause}, der skal " +
+                $"oversættes til {targetLanguage}. Svar med PRÆCIS {texts.Count} linjer, i samme rækkefølge som " +
+                "input, hver linje nummereret ligesom input (\"1. \", \"2. \" osv.) efterfulgt af kun den " +
+                "oversatte tekst - ingen indledning, ingen forklaringer, ingen ekstra linjer, ingen " +
+                "anførselstegn. Oversæt hver linje for sig og bland aldrig indhold mellem linjer.";
+
+            var userPrompt = string.Join("\n", texts.Select((t, i) => $"{i + 1}. {t}"));
+
+            var raw = await CompleteAsync(systemPrompt, userPrompt, model, cancellationToken);
+            return ParseNumberedList(raw, texts.Count);
+        }
+
+        private static readonly Regex NumberedListLineRegex = new(@"^\s*(\d+)[\.\)]\s?(.*)$", RegexOptions.Compiled);
+
+        // Alt-eller-intet parsing, se TranslateBatchAsync's doc-kommentar - enhver uoverensstemmelse i
+        // antal linjer betyder hele batchen kasseres frem for at gætte.
+        private static IReadOnlyList<string>? ParseNumberedList(string raw, int expectedCount)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return null;
+
+            var lines = raw.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var byIndex = new Dictionary<int, string>();
+            foreach (var line in lines)
+            {
+                var match = NumberedListLineRegex.Match(line);
+                if (!match.Success) continue;
+                if (!int.TryParse(match.Groups[1].Value, out var index)) continue;
+                byIndex[index] = match.Groups[2].Value.Trim();
+            }
+
+            if (byIndex.Count != expectedCount) return null;
+
+            var ordered = new string[expectedCount];
+            for (var i = 1; i <= expectedCount; i++)
+            {
+                if (!byIndex.TryGetValue(i, out var text)) return null;
+                ordered[i - 1] = text;
+            }
+            return ordered;
+        }
+
+        /// <summary>
         /// Genkender hvilket sprog <paramref name="text"/> er skrevet på og returnerer sprognavnet på dansk
         /// (fx "Dansk", "Engelsk").
         /// </summary>

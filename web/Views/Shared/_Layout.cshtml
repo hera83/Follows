@@ -50,56 +50,56 @@
 <body>
     <div class="app-shell" id="appShell">
         <button id="mobileMenuToggle" class="mobile-menu-toggle" type="button"
-                aria-label="Åbn menu" aria-expanded="false" aria-controls="sideMenu">
+                aria-label="@T("Åbn menu")" aria-expanded="false" aria-controls="sideMenu">
             <i class="bi bi-list"></i>
         </button>
         <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
 
-        <nav class="side-menu" id="sideMenu" aria-label="Hovedmenu">
+        <nav class="side-menu" id="sideMenu" aria-label="@T("Hovedmenu")">
             <div class="side-menu-top">
-                <button id="sidebarToggle" class="menu-item menu-brand" type="button" aria-label="Fold menu">
+                <button id="sidebarToggle" class="menu-item menu-brand" type="button" aria-label="@T("Fold menu")">
                     <span class="menu-icon"><i class="bi bi-chat-heart-fill"></i></span>
                     <span class="menu-text">Follows</span>
                 </button>
 
                 <div class="menu-nav">
-                    <a class="menu-item" asp-controller="Feed" asp-action="Index" title="Feeds">
+                    <a class="menu-item" asp-controller="Feed" asp-action="Index" title="@T("Feeds")">
                         <span class="menu-icon"><i class="bi bi-images"></i></span>
-                        <span class="menu-text">Feeds</span>
+                        <span class="menu-text">@T("Feeds")</span>
                     </a>
-                    <a class="menu-item" asp-controller="Documents" asp-action="Index" title="Documents">
+                    <a class="menu-item" asp-controller="Documents" asp-action="Index" title="@T("Documents")">
                         <span class="menu-icon"><i class="bi bi-folder2-open"></i></span>
-                        <span class="menu-text">Documents</span>
+                        <span class="menu-text">@T("Documents")</span>
                     </a>
                 </div>
             </div>
 
             <div class="side-menu-bottom">
-                <a class="menu-item" asp-controller="Profile" asp-action="Index" title="Min Profil">
+                <a class="menu-item" asp-controller="Profile" asp-action="Index" title="@T("Min Profil")">
                     <span class="menu-icon" id="sidebarAvatarWrapper">
                         @if (hasAvatar && currentUserId is not null)
                         {
                             <img src="@Url.Action("Avatar", "Profile", new { userId = currentUserId })"
-                                 class="menu-avatar" alt="Profilbillede" />
+                                 class="menu-avatar" alt="@T("Profilbillede")" />
                         }
                         else
                         {
                             <i class="bi bi-person-circle"></i>
                         }
                     </span>
-                    <span class="menu-text">Min Profil</span>
+                    <span class="menu-text">@T("Min Profil")</span>
                 </a>
                 @if (User.IsInRole(AppRoles.Developer) || User.IsInRole(AppRoles.Administrator))
                 {
-                    <a class="menu-item" asp-controller="Settings" asp-action="Index" title="Indstillinger">
+                    <a class="menu-item" asp-controller="Settings" asp-action="Index" title="@T("Indstillinger")">
                         <span class="menu-icon"><i class="bi bi-gear"></i></span>
-                        <span class="menu-text">Indstillinger</span>
+                        <span class="menu-text">@T("Indstillinger")</span>
                     </a>
                 }
                 <form asp-controller="Account" asp-action="Logout" method="post" class="menu-form">
-                    <button type="submit" class="menu-item menu-item-logout w-100" title="Log ud">
+                    <button type="submit" class="menu-item menu-item-logout w-100" title="@T("Log ud")">
                         <span class="menu-icon"><i class="bi bi-box-arrow-right"></i></span>
-                        <span class="menu-text">Log ud</span>
+                        <span class="menu-text">@T("Log ud")</span>
                     </button>
                 </form>
             </div>
@@ -111,6 +111,20 @@
         </div>
     </div>
 
+    @{
+        // Registers the handful of Danish strings site.js itself needs (T() calls, not visible markup) so
+        // they exist in the catalog the same way every other @T()/@TJs() call does - see
+        // LocalizedRazorPage.JsCatalogJson. "Åbn menu" is already registered above via the mobile-menu
+        // aria-label; "Luk menu" only ever appears dynamically (site.js toggles it), so it needs an
+        // explicit T() call here to be known at all.
+        _ = T("Luk menu");
+        _ = T("Luk");
+        _ = T("Netværksfejl. Prøv igen.");
+    }
+    <script>
+        window.i18n = @JsCatalogJson();
+        window.appLocale = '@web.Constants.AppLanguages.GetLocaleTag(CurrentLanguage)';
+    </script>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>

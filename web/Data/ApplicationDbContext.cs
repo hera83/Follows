@@ -40,6 +40,10 @@ namespace web.Data
         public DbSet<Document> Documents { get; set; } = null!;
         public DbSet<DocumentTranslation> DocumentTranslations { get; set; } = null!;
 
+        // Bulk UI-catalog translation (menu/Feed/Documents/Profil chrome) - see web/Infrastructure/UiTranslation/*
+        public DbSet<UiTranslationEntry> UiTranslationEntries { get; set; } = null!;
+        public DbSet<InstalledLanguage> InstalledLanguages { get; set; } = null!;
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -408,6 +412,44 @@ namespace web.Data
                     .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasIndex(e => new { e.DocumentId, e.LanguageCode }).IsUnique();
+            });
+
+            // Configure UiTranslationEntry
+            builder.Entity<UiTranslationEntry>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.SourceTextHash)
+                    .IsRequired()
+                    .HasMaxLength(64);
+
+                entity.Property(e => e.SourceText)
+                    .IsRequired();
+
+                entity.Property(e => e.LanguageCode)
+                    .IsRequired()
+                    .HasMaxLength(10);
+
+                entity.Property(e => e.TranslatedText)
+                    .IsRequired();
+
+                entity.Property(e => e.CreatedAtUtc)
+                    .IsRequired();
+
+                entity.HasIndex(e => new { e.SourceTextHash, e.LanguageCode }).IsUnique();
+            });
+
+            // Configure InstalledLanguage
+            builder.Entity<InstalledLanguage>(entity =>
+            {
+                entity.HasKey(e => e.LanguageCode);
+
+                entity.Property(e => e.LanguageCode)
+                    .IsRequired()
+                    .HasMaxLength(10);
+
+                entity.Property(e => e.InstalledAtUtc)
+                    .IsRequired();
             });
         }
     }

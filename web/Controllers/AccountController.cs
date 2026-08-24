@@ -67,12 +67,20 @@ namespace web.Controllers
             if (result.Succeeded)
             {
                 _logger.LogInformation("User logged in: {UserName}", user.UserName);
-                if (!string.IsNullOrWhiteSpace(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl))
+                var destination = !string.IsNullOrWhiteSpace(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl)
+                    ? model.ReturnUrl
+                    : Url.Action("Index", "Feed")!;
+
+                // Non-Danish profile language -> route through the "siden oversættes" wait page first.
+                // UiLocalizationController.Preparing itself decides whether there's actually a meaningful
+                // gap to fill for this language and redirects straight through to `destination` when not -
+                // this controller doesn't need to duplicate that check.
+                if (AppLanguages.Normalize(user.PreferredLanguage) != AppLanguages.Default)
                 {
-                    return Redirect(model.ReturnUrl);
+                    return RedirectToAction("Preparing", "UiLocalization", new { returnUrl = destination });
                 }
 
-                return RedirectToAction("Index", "Feed");
+                return Redirect(destination);
             }
 
             if (result.IsLockedOut)

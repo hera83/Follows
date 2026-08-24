@@ -7,6 +7,7 @@ using web.Constants;
 using web.Data;
 using web.Data.Entities;
 using web.Infrastructure;
+using web.Infrastructure.UiTranslation;
 using web.Repositories.Logs.Interfaces;
 using web.Services.AiGateway;
 using web.Services.AiGateway.Dtos.KnowledgeBase;
@@ -36,6 +37,8 @@ namespace web.Controllers
         private readonly ISmsService _smsService;
         private readonly IMailService _mailService;
         private readonly IConfiguration _configuration;
+        private readonly IUiTranslationBulkService _uiTranslationBulkService;
+        private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<SettingsController> _logger;
 
         public SettingsController(
@@ -49,6 +52,8 @@ namespace web.Controllers
             ISmsService smsService,
             IMailService mailService,
             IConfiguration configuration,
+            IUiTranslationBulkService uiTranslationBulkService,
+            IServiceScopeFactory scopeFactory,
             ILogger<SettingsController> logger)
         {
             _context = context;
@@ -61,6 +66,8 @@ namespace web.Controllers
             _smsService = smsService;
             _mailService = mailService;
             _configuration = configuration;
+            _uiTranslationBulkService = uiTranslationBulkService;
+            _scopeFactory = scopeFactory;
             _logger = logger;
         }
 
@@ -148,6 +155,13 @@ namespace web.Controllers
         }
 
         [HttpGet]
+        public async Task<IActionResult> LanguagesTabContent()
+        {
+            var model = await GetLanguageProgressAsync(HttpContext.RequestAborted);
+            return PartialView("_LanguagesTab", model);
+        }
+
+        [HttpGet]
         public async Task<IActionResult> UsersTable(UserFilterViewModel filter)
         {
             var model = await GetUsersAsync(filter);
@@ -173,6 +187,109 @@ namespace web.Controllers
         {
             var model = await GetOllamaRunningStatusAsync(HttpContext.RequestAborted);
             return PartialView("_OllamaRunningModelsTableBody", model);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> LanguagesTable()
+        {
+            var model = await GetLanguageProgressAsync(HttpContext.RequestAborted);
+            return PartialView("_LanguagesTableBody", model);
+        }
+
+        /// <summary>
+        /// Warms up (or tops up) a language's UI-catalog translation from Settings → Sprog, without
+        /// waiting for a user to actually log in/switch to it first. Runs in the background — this action
+        /// returns immediately, the table polls UiTranslationLanguageStatusTracker for live progress (see
+        /// LanguagesTable/UiLocalizationController.Status, the same status the login/profile-save wait
+        /// page reads).
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AddLanguage(string languageCode)
+        {
+            if (!AppLanguages.IsValid(languageCode) || languageCode == AppLanguages.Default)
+                return this.ToastErrorJson("Ugyldigt sprog.");
+
+            var normalized = AppLanguages.Normalize(languageCode);
+
+            // Idempotent - re-adding an already-installed language just tops up its translation below,
+            // without touching InstalledAtUtc or duplicating the InstalledLanguage row.
+            await _uiTranslationBulkService.InstallLanguageAsync(normalized, HttpContext.RequestAborted);
+
+            _ = Task.Run(async () =>
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var bulk = scope.ServiceProvider.GetRequiredService<IUiTranslationBulkService>();
+                try
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(UiTranslationLimits.JobTimeoutMinutes));
+                    await bulk.RunAsync(normalized, cts.Token);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "UI catalog bulk translation to {Language} (triggered from Settings) did not finish cleanly", normalized);
+                }
+            });
+
+            return this.ToastSuccessJson($"{AppLanguages.GetNativeName(normalized)} er installeret og oversættes nu.");
+        }
+
+        /// <summary>
+        /// "Opdater"-knappen i Sprog-tabellen — sletter et allerede installeret sprogs oversatte tekster
+        /// (se ClearTranslationsAsync) og starter en fuldstændig gen-oversættelse af hele kataloget fra
+        /// bunden, samme baggrundskørsel som AddLanguage. I modsætning til blot at trykke "Tilføj sprog"
+        /// igen (som er et no-op når sproget allerede er 100% oversat, da RunAsync kun topper manglende
+        /// tekster op) tvinger denne knap alt til at blive oversat på ny — brugbart efter rettelser i den
+        /// danske kildetekst.
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RefreshLanguage(string languageCode)
+        {
+            if (!AppLanguages.IsValid(languageCode) || languageCode == AppLanguages.Default)
+                return this.ToastErrorJson("Ugyldigt sprog.");
+
+            var normalized = AppLanguages.Normalize(languageCode);
+            var cleared = await _uiTranslationBulkService.ClearTranslationsAsync(normalized, HttpContext.RequestAborted);
+            if (!cleared)
+                return this.ToastErrorJson("Sproget er ikke installeret.");
+
+            _ = Task.Run(async () =>
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var bulk = scope.ServiceProvider.GetRequiredService<IUiTranslationBulkService>();
+                try
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(UiTranslationLimits.JobTimeoutMinutes));
+                    await bulk.RunAsync(normalized, cts.Token);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "UI catalog forced re-translation to {Language} (triggered from Settings) did not finish cleanly", normalized);
+                }
+            });
+
+            return this.ToastSuccessJson($"{AppLanguages.GetNativeName(normalized)} genoversættes nu fra bunden.");
+        }
+
+        /// <summary>
+        /// Fjerner et sprog fra "installeret"-listen og sletter dets oversatte tekster (se
+        /// UninstallLanguageAsync) — sproget forsvinder fra Sprog-tabellen og fra nye brugeres
+        /// Profil-dropdown, og en senere gen-tilføjelse starter en helt ny oversættelsesproces fra bunden.
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RemoveLanguage(string languageCode)
+        {
+            if (!AppLanguages.IsValid(languageCode) || languageCode == AppLanguages.Default)
+                return this.ToastErrorJson("Ugyldigt sprog.");
+
+            var normalized = AppLanguages.Normalize(languageCode);
+            var removed = await _uiTranslationBulkService.UninstallLanguageAsync(normalized, HttpContext.RequestAborted);
+
+            return removed
+                ? this.ToastSuccessJson($"{AppLanguages.GetNativeName(normalized)} er fjernet.")
+                : this.ToastErrorJson("Sproget er ikke installeret.");
         }
 
         [HttpGet]
@@ -804,6 +921,35 @@ namespace web.Controllers
             {
                 AllowPublicRegistration = await GetBoolSettingAsync(AppSettingKeys.AllowPublicRegistration)
             };
+        }
+
+        /// <summary>
+        /// Rows for the Sprog-tabel — kun installerede sprog (se UiTranslationLanguageStatusTracker og
+        /// InstalledLanguage). Sprog der endnu ikke er installeret vælges udelukkende via "Tilføj
+        /// sprog"-dropdownen, som selv henter den fulde liste (se _LanguagesTab.cshtml).
+        /// </summary>
+        private async Task<List<LanguageProgressViewModel>> GetLanguageProgressAsync(CancellationToken cancellationToken)
+        {
+            var overview = await _uiTranslationBulkService.GetProgressOverviewAsync(cancellationToken);
+            return overview
+                .Where(p => p.IsInstalled)
+                .Select(p => new LanguageProgressViewModel
+                {
+                    LanguageCode = p.LanguageCode,
+                    NativeName = p.NativeName,
+                    TranslatedCount = p.TranslatedCount,
+                    TotalCount = p.TotalCount,
+                    PercentComplete = p.PercentComplete,
+                    IsRunning = p.IsRunning,
+                    RunningCompleted = p.RunningCompleted,
+                    RunningTotal = p.RunningTotal,
+                    IsInstalled = p.IsInstalled
+                })
+                // Kørende sprog øverst, dernæst mest oversatte først.
+                .OrderByDescending(p => p.IsRunning)
+                .ThenByDescending(p => p.PercentComplete)
+                .ThenBy(p => p.NativeName)
+                .ToList();
         }
 
         private async Task<ThemeSettingsViewModel> GetThemeSettingsAsync()

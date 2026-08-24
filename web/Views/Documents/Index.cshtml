@@ -2,13 +2,13 @@
 
 <div>
     <div class="page-header">
-        <h1><i class="bi bi-folder2-open me-2"></i>Documents</h1>
-        <p>Gem skoleskemaer, rejseplaner, aktivitetsplaner og andre dokumenter i grupper, så I nemt kan finde dem igen.</p>
+        <h1><i class="bi bi-folder2-open me-2"></i>@T("Documents")</h1>
+        <p>@T("Gem skoleskemaer, rejseplaner, aktivitetsplaner og andre dokumenter i grupper, så I nemt kan finde dem igen.")</p>
     </div>
 
     <div class="table-toolbar mb-3">
         <div class="table-toolbar-end">
-            <button class="btn btn-primary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#createDocumentGroupModal" title="Ny gruppe" aria-label="Ny gruppe">
+            <button class="btn btn-primary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#createDocumentGroupModal" title="@T("Ny gruppe")" aria-label="@T("Ny gruppe")">
                 <i class="bi bi-folder-plus"></i>
             </button>
         </div>
@@ -26,22 +26,22 @@
             <form asp-action="CreateGroup" method="post">
                 @Html.AntiForgeryToken()
                 <div class="modal-header">
-                    <h1 class="modal-title fs-5" id="createDocumentGroupModalLabel"><i class="bi bi-folder-plus me-2"></i>Ny gruppe</h1>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Luk"></button>
+                    <h1 class="modal-title fs-5" id="createDocumentGroupModalLabel"><i class="bi bi-folder-plus me-2"></i>@T("Ny gruppe")</h1>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Luk")"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Navn</label>
-                        <input name="Name" class="form-control" placeholder="f.eks. Skoleskemaer" required maxlength="@DocumentLimits.MaxGroupNameLength" />
+                        <label class="form-label">@T("Navn")</label>
+                        <input name="Name" class="form-control" placeholder="@T("f.eks. Skoleskemaer")" required maxlength="@DocumentLimits.MaxGroupNameLength" />
                     </div>
                     <div class="mb-0">
-                        <label class="form-label">Beskrivelse (valgfri)</label>
+                        <label class="form-label">@T("Beskrivelse (valgfri)")</label>
                         <textarea name="Description" class="form-control" rows="2" maxlength="@DocumentLimits.MaxGroupDescriptionLength"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Annuller</button>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-floppy me-1"></i>Opret</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>@T("Annuller")</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-floppy me-1"></i>@T("Opret")</button>
                 </div>
             </form>
         </div>

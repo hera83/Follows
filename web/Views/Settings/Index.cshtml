@@ -18,6 +18,9 @@
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="theme-tab" data-bs-toggle="tab" data-bs-target="#theme-pane" type="button" role="tab" aria-controls="theme-pane" aria-selected="false">Tema</button>
                 </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="languages-tab" data-bs-toggle="tab" data-bs-target="#languages-pane" type="button" role="tab" aria-controls="languages-pane" aria-selected="false">Sprog</button>
+                </li>
                 @if (Model.ShowOllamaTab)
                 {
                     <li class="nav-item" role="presentation">
@@ -51,6 +54,7 @@
                 </div>
                 <div class="tab-pane fade" id="registration-pane" role="tabpanel" aria-labelledby="registration-tab" tabindex="0" data-tab-endpoint="@Url.Action("RegistrationTabContent")"></div>
                 <div class="tab-pane fade" id="theme-pane" role="tabpanel" aria-labelledby="theme-tab" tabindex="0" data-tab-endpoint="@Url.Action("ThemeTabContent")"></div>
+                <div class="tab-pane fade" id="languages-pane" role="tabpanel" aria-labelledby="languages-tab" tabindex="0" data-tab-endpoint="@Url.Action("LanguagesTabContent")"></div>
                 @if (Model.ShowOllamaTab)
                 {
                     <div class="tab-pane fade" id="ollama-pane" role="tabpanel" aria-labelledby="ollama-tab" tabindex="0" data-tab-endpoint="@Url.Action("OllamaTabContent")"></div>

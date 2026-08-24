@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using web.Data;
 
@@ -10,9 +11,11 @@ using web.Data;
 namespace web.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260824080255_AddUiTranslationEntries")]
+    partial class AddUiTranslationEntries
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.0");
@@ -611,20 +614,6 @@ namespace web.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("FileMetadata");
-                });
-
-            modelBuilder.Entity("web.Data.Entities.InstalledLanguage", b =>
-                {
-                    b.Property<string>("LanguageCode")
-                        .HasMaxLength(10)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("InstalledAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("LanguageCode");
-
-                    b.ToTable("InstalledLanguages");
                 });
 
             modelBuilder.Entity("web.Data.Entities.SmsMessage", b =>

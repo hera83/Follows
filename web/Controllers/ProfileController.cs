@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using web.Constants;
 using web.Data.Entities;
 using web.Infrastructure;
+using web.Infrastructure.UiTranslation;
 using web.Repositories.UserProfile.Dtos;
 using web.Repositories.UserProfile.Interfaces;
 using web.ViewModels;
@@ -18,15 +19,21 @@ namespace web.Controllers
 
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IUserProfileService _profileService;
+        private readonly IUiTranslationBulkService _uiTranslationBulkService;
+        private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<ProfileController> _logger;
 
         public ProfileController(
             UserManager<ApplicationUser> userManager,
             IUserProfileService profileService,
+            IUiTranslationBulkService uiTranslationBulkService,
+            IServiceScopeFactory scopeFactory,
             ILogger<ProfileController> logger)
         {
             _userManager = userManager;
             _profileService = profileService;
+            _uiTranslationBulkService = uiTranslationBulkService;
+            _scopeFactory = scopeFactory;
             _logger = logger;
         }
 
@@ -37,6 +44,16 @@ namespace web.Controllers
             if (user is null) return RedirectToAction("Login", "Account");
 
             var currentUserName = user.UserName != user.Email ? user.UserName : string.Empty;
+            var currentLanguage = AppLanguages.Normalize(user.PreferredLanguage);
+
+            var installedLanguages = (await _uiTranslationBulkService.GetInstalledLanguagesAsync(HttpContext.RequestAborted)).ToList();
+
+            // The user's own current language is always kept selectable, even if an admin uninstalled it
+            // after they picked it — the form must never silently drop their existing selection.
+            if (installedLanguages.All(l => l.Code != currentLanguage))
+            {
+                installedLanguages.Add((currentLanguage, AppLanguages.GetNativeName(currentLanguage)));
+            }
 
             var vm = new ProfileViewModel
             {
@@ -46,12 +63,13 @@ namespace web.Controllers
                 PhoneNumber = user.PhoneNumber,
                 HasAvatar = user.ProfilePictureId.HasValue,
                 ThemePreference = user.ThemePreference ?? ThemeMode.System,
+                InstalledLanguages = installedLanguages,
                 EditForm = new EditProfileViewModel
                 {
                     UserName = currentUserName,
                     DisplayName = user.DisplayName,
                     PhoneNumber = user.PhoneNumber,
-                    PreferredLanguage = AppLanguages.Normalize(user.PreferredLanguage)
+                    PreferredLanguage = currentLanguage
                 }
             };
 
@@ -71,6 +89,16 @@ namespace web.Controllers
                 return this.ToastErrorJson(string.IsNullOrWhiteSpace(errors) ? "Profilen kunne ikke opdateres. Kontroller felterne." : errors);
             }
 
+            var previousLanguage = AppLanguages.Normalize(user.PreferredLanguage);
+            var requestedLanguage = AppLanguages.Normalize(model.EditForm.PreferredLanguage);
+
+            if (requestedLanguage != AppLanguages.Default && requestedLanguage != previousLanguage)
+            {
+                var installed = await _uiTranslationBulkService.GetInstalledLanguagesAsync(HttpContext.RequestAborted);
+                if (installed.All(l => l.Code != requestedLanguage))
+                    return this.ToastErrorJson("Det valgte sprog er ikke installeret. Kontakt en administrator under Indstillinger → Sprog.");
+            }
+
             var result = await _profileService.UpdateProfileAsync(new UpdateProfileRequestDto
             {
                 UserId = user.Id,
@@ -81,9 +109,51 @@ namespace web.Controllers
                 NewPassword = model.EditForm.NewPassword
             }, HttpContext.RequestAborted);
 
-            return result.Success
-                ? this.ToastSuccessJson("Profil opdateret.")
-                : this.ToastErrorJson(result.ErrorMessage ?? "Opdatering mislykkedes.");
+            if (!result.Success)
+                return this.ToastErrorJson(result.ErrorMessage ?? "Opdatering mislykkedes.");
+
+            var newLanguage = AppLanguages.Normalize(model.EditForm.PreferredLanguage);
+            if (newLanguage != AppLanguages.Default && newLanguage != previousLanguage)
+            {
+                var gap = await _uiTranslationBulkService.CountGapAsync(newLanguage, HttpContext.RequestAborted);
+                if (gap >= UiTranslationLimits.GapThreshold)
+                {
+                    // A real gap - send the client to the wait page instead, which starts (and dedupes) its
+                    // own bulk job - see UiLocalizationController.Preparing. Deliberately doesn't also kick
+                    // a background Task.Run here too, to avoid two concurrent bulk runs for the same
+                    // language racing each other.
+                    return Json(new
+                    {
+                        success = true,
+                        message = "Profil opdateret.",
+                        type = "success",
+                        redirectToWaitPage = true,
+                        waitUrl = Url.Action("Preparing", "UiLocalization", new { returnUrl = Url.Action("Index", "Profile") })
+                    });
+                }
+
+                if (gap > 0)
+                {
+                    // Small gap - not worth a wait-page spinner, just top it up quietly in the background.
+                    // Own DI scope, since this request's scope is disposed as soon as Edit returns, same
+                    // reasoning as DocumentsController.TranslateStart.
+                    _ = Task.Run(async () =>
+                    {
+                        using var scope = _scopeFactory.CreateScope();
+                        var bulk = scope.ServiceProvider.GetRequiredService<IUiTranslationBulkService>();
+                        try
+                        {
+                            await bulk.RunAsync(newLanguage, cancellationToken: CancellationToken.None);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Background UI catalog translation to {Language} after profile save did not finish cleanly", newLanguage);
+                        }
+                    });
+                }
+            }
+
+            return this.ToastSuccessJson("Profil opdateret.");
         }
 
         [HttpPost]

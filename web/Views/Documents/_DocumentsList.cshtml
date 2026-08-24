@@ -5,8 +5,8 @@
 {
     <div class="doc-empty">
         <i class="bi bi-file-earmark"></i>
-        <h2>Ingen dokumenter endnu</h2>
-        <p>Upload en fil for at komme i gang.</p>
+        <h2>@T("Ingen dokumenter endnu")</h2>
+        <p>@T("Upload en fil for at komme i gang.")</p>
     </div>
 }
 else
@@ -15,11 +15,11 @@ else
         <table class="table align-middle">
             <thead>
                 <tr>
-                    <th>Fil</th>
-                    <th>Uploadet af</th>
-                    <th>Dato</th>
-                    <th>Størrelse</th>
-                    <th class="text-end">Handlinger</th>
+                    <th>@T("Fil")</th>
+                    <th>@T("Uploadet af")</th>
+                    <th>@T("Dato")</th>
+                    <th>@T("Størrelse")</th>
+                    <th class="text-end">@T("Handlinger")</th>
                 </tr>
             </thead>
             <tbody>
@@ -31,26 +31,26 @@ else
                             <i class="bi @iconClass me-2"></i><button type="button" class="btn btn-link p-0 align-baseline doc-title-link" data-bs-toggle="modal" data-bs-target="#documentPreviewModal"
                                     data-id="@doc.Id" data-title="@doc.Title" data-content-type="@doc.ContentType"
                                     data-can-preview="@doc.CanPreviewInline.ToString().ToLower()" data-can-translate="@doc.CanTranslate.ToString().ToLower()" data-icon="@iconClass"
-                                    title="Vis" aria-label="Vis @doc.Title">@doc.Title</button>
+                                    title="@T("Vis")" aria-label="@T("Vis") @doc.Title">@doc.Title</button>
                         </td>
                         <td>@doc.UploadedByDisplayName</td>
-                        <td>@doc.CreatedAtUtc.ToLocalTime().ToString("d. MMM yyyy", new System.Globalization.CultureInfo("da-DK"))</td>
+                        <td>@doc.CreatedAtUtc.ToLocalTime().ToString("d. MMM yyyy", new System.Globalization.CultureInfo(web.Constants.AppLanguages.GetLocaleTag(CurrentLanguage)))</td>
                         <td>@FormatFileSize(doc.FileSizeBytes)</td>
                         <td class="text-end">
                             <div class="d-inline-flex gap-1">
                                 <button type="button" class="btn btn-sm btn-secondary btn-icon" data-bs-toggle="modal" data-bs-target="#documentPreviewModal"
                                         data-id="@doc.Id" data-title="@doc.Title" data-content-type="@doc.ContentType"
                                         data-can-preview="@doc.CanPreviewInline.ToString().ToLower()" data-can-translate="@doc.CanTranslate.ToString().ToLower()" data-icon="@iconClass"
-                                        title="Vis" aria-label="Vis">
+                                        title="@T("Vis")" aria-label="@T("Vis")">
                                     <i class="bi bi-eye"></i>
                                 </button>
-                                <a class="btn btn-sm btn-secondary btn-icon" href="@Url.Action("Download", new { id = doc.Id })" title="Download" aria-label="Download">
+                                <a class="btn btn-sm btn-secondary btn-icon" href="@Url.Action("Download", new { id = doc.Id })" title="@T("Download")" aria-label="@T("Download")">
                                     <i class="bi bi-download"></i>
                                 </a>
                                 @if (doc.CanDelete)
                                 {
                                     <button type="button" class="btn btn-sm btn-outline-danger btn-icon" data-bs-toggle="modal" data-bs-target="#deleteDocumentModal"
-                                            data-id="@doc.Id" data-title="@doc.Title" title="Slet" aria-label="Slet">
+                                            data-id="@doc.Id" data-title="@doc.Title" title="@T("Slet")" aria-label="@T("Slet")">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 }

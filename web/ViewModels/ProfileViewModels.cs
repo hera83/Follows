@@ -11,6 +11,14 @@ namespace web.ViewModels
         public bool HasAvatar { get; set; }
         public string? ThemePreference { get; set; }
         public EditProfileViewModel EditForm { get; set; } = new();
+
+        /// <summary>
+        /// Languages offered in the "Foretrukket sprog"-dropdown — Danish plus every language an admin
+        /// has installed from Settings → Sprog (see IUiTranslationBulkService.GetInstalledLanguagesAsync),
+        /// with the user's own currently-selected language always included even if it was since
+        /// uninstalled (see ProfileController.Index), so the form never silently drops their selection.
+        /// </summary>
+        public List<(string Code, string NativeName)> InstalledLanguages { get; set; } = new();
     }
 
     public class EditProfileViewModel

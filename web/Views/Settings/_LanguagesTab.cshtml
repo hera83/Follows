@@ -1,0 +1,151 @@
+@model List<web.ViewModels.LanguageProgressViewModel>
+
+@{
+    // Modellen indeholder allerede kun installerede sprog (se SettingsController.GetLanguageProgressAsync) -
+    // bruges her udelukkende til at holde "Tilføj sprog"-dropdownen fri for dem der allerede er tilføjet.
+    var installedCodes = Model.Select(l => l.LanguageCode).ToHashSet();
+}
+
+<div class="settings-option mb-3">
+    <div class="settings-option-icon">
+        <i class="bi bi-translate"></i>
+    </div>
+    <div class="settings-option-body">
+        <p class="settings-option-hint mb-3">
+            <i class="bi bi-info-circle me-1"></i>
+            Viser status for den automatiske UI-oversættelse (menu, Feeds, Documents, Profil m.m.) — ikke
+            dokument- eller opslags-oversættelse. Tabellen viser kun <strong>installerede</strong> sprog —
+            de eneste der kan vælges under "Min Profil" (dansk er altid tilgængeligt). Brug "Tilføj sprog"
+            for at gøre et nyt sprog tilgængeligt og foroversætte det med det samme; brug opdater-ikonet
+            for at slette og genoversætte et sprogs tekster helt fra bunden (f.eks. efter en rettelse i den
+            danske kildetekst); brug papirkurv-ikonet for at fjerne et sprog igen — de oversatte tekster
+            slettes med det samme, så en senere gen-tilføjelse starter en helt ny oversættelse fra bunden.
+        </p>
+
+        <form id="addLanguageForm" asp-action="AddLanguage" asp-controller="Settings" method="post" class="d-flex flex-wrap gap-2 align-items-center mb-3">
+            @Html.AntiForgeryToken()
+            <select name="languageCode" class="form-select" style="max-width: 260px;">
+                @foreach (var lang in web.Constants.AppLanguages.All)
+                {
+                    if (lang.Code == web.Constants.AppLanguages.Default) continue;
+                    if (installedCodes.Contains(lang.Code)) continue;
+                    <option value="@lang.Code">@lang.NativeName (@lang.Code)</option>
+                }
+            </select>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i> Tilføj sprog
+            </button>
+        </form>
+
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Sprog</th>
+                        <th>Fremgang</th>
+                        <th class="text-end">Handling</th>
+                    </tr>
+                </thead>
+                <tbody id="languagesTableBody">
+                    @await Html.PartialAsync("_LanguagesTableBody", Model)
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    (() => {
+        const tableBody = document.getElementById('languagesTableBody');
+        const addForm = document.getElementById('addLanguageForm');
+        if (!tableBody || tableBody.dataset.bound === 'true') return;
+        tableBody.dataset.bound = 'true';
+
+        const tableEndpoint = '@Url.Action("LanguagesTable")';
+        let pollTimer = null;
+
+        const anyRowRunning = () =>
+            Array.from(tableBody.querySelectorAll('tr')).some((row) => row.dataset.isRunning === 'true');
+
+        const refreshTable = async () => {
+            try {
+                const res = await fetch(tableEndpoint, { headers: { 'X-Requested-With': 'fetch' } });
+                if (!res.ok) return;
+                tableBody.innerHTML = await res.text();
+            } catch { /* prøv igen ved næste poll */ }
+        };
+
+        const ensurePolling = () => {
+            if (pollTimer) return;
+            pollTimer = setInterval(async () => {
+                await refreshTable();
+                if (!anyRowRunning()) {
+                    clearInterval(pollTimer);
+                    pollTimer = null;
+                }
+            }, 2000);
+        };
+
+        const addOptionToSelect = (code, nativeName) => {
+            const select = addForm?.querySelector('select[name="languageCode"]');
+            if (!select || select.querySelector(`option[value="${CSS.escape(code)}"]`)) return;
+
+            const option = document.createElement('option');
+            option.value = code;
+            option.textContent = `${nativeName} (${code})`;
+
+            // Hold listen alfabetisk sorteret efter visningsnavn, samme rækkefølge som serveren bygger den i.
+            const existing = Array.from(select.options);
+            const insertBefore = existing.find((o) => o.textContent.localeCompare(option.textContent) > 0);
+            select.insertBefore(option, insertBefore || null);
+        };
+
+        // En knap kan være i en række der bliver erstattet af refreshTable() - delegeret lytter på
+        // selve tbody'en, så den virker for rækker der kommer til efter en poll.
+        tableBody.addEventListener('click', async (e) => {
+            const refreshBtn = e.target.closest('.language-refresh-btn');
+            const removeBtn = e.target.closest('.language-remove-btn');
+            const btn = refreshBtn || removeBtn;
+            if (!btn) return;
+
+            btn.disabled = true;
+            const token = addForm?.querySelector('input[name="__RequestVerificationToken"]')?.value;
+            const fd = new FormData();
+            fd.set('languageCode', btn.dataset.languageCode);
+            if (token) fd.set('__RequestVerificationToken', token);
+
+            const endpoint = removeBtn ? '@Url.Action("RemoveLanguage")' : '@Url.Action("RefreshLanguage")';
+            const res = await fetch(endpoint, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'fetch' } });
+            const data = await res.json().catch(() => ({}));
+            window.FvToast?.show(data.type || (data.success ? 'success' : 'error'), data.message);
+
+            if (removeBtn && data.success) {
+                const row = btn.closest('tr');
+                addOptionToSelect(btn.dataset.languageCode, row?.dataset.nativeName || btn.dataset.languageCode);
+            }
+
+            await refreshTable();
+            ensurePolling();
+        });
+
+        addForm?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitBtn = addForm.querySelector('button[type="submit"]');
+            const select = addForm.querySelector('select[name="languageCode"]');
+            if (submitBtn) submitBtn.disabled = true;
+
+            const data = await window.FvForm.submit(addForm);
+            if (submitBtn) submitBtn.disabled = false;
+
+            if (data.success) {
+                // Sproget er nu installeret - fjern det fra "tilføj"-listen med det samme (undgår at
+                // vente på en side-genindlæsning for at se det forsvinde derfra).
+                select?.querySelector(`option[value="${CSS.escape(select.value)}"]`)?.remove();
+                await refreshTable();
+                ensurePolling();
+            }
+        });
+
+        if (anyRowRunning()) ensurePolling();
+    })();
+</script>

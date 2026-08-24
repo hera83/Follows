@@ -14,7 +14,7 @@
         </div>
         <div class="feed-post-header-text">
             <span class="feed-author-name">@Model.AuthorDisplayName</span>
-            <time class="feed-time" data-utc="@Model.CreatedAtUtc.ToString("o")">@Model.CreatedAtUtc.ToString("d. MMM yyyy HH:mm")</time>
+            <time class="feed-time" data-utc="@Model.CreatedAtUtc.ToString("o")">@Model.CreatedAtUtc.ToString("d. MMM yyyy HH:mm", new System.Globalization.CultureInfo(web.Constants.AppLanguages.GetLocaleTag(CurrentLanguage)))</time>
         </div>
         @if (Model.CanEdit || Model.CanDelete)
         {
@@ -22,14 +22,14 @@
                 @if (Model.CanEdit)
                 {
                     <button type="button" class="btn btn-secondary btn-icon btn-sm feed-edit-post"
-                            data-post-id="@Model.Id" title="Rediger opslag" aria-label="Rediger opslag">
+                            data-post-id="@Model.Id" title="@T("Rediger opslag")" aria-label="@T("Rediger opslag")">
                         <i class="bi bi-pencil"></i>
                     </button>
                 }
                 @if (Model.CanDelete)
                 {
                     <button type="button" class="btn btn-secondary btn-icon btn-sm feed-delete-post"
-                            data-post-id="@Model.Id" title="Slet opslag" aria-label="Slet opslag">
+                            data-post-id="@Model.Id" title="@T("Slet opslag")" aria-label="@T("Slet opslag")">
                         <i class="bi bi-trash"></i>
                     </button>
                 }
@@ -68,7 +68,7 @@
                     }
                     else
                     {
-                        <img src="@Url.Action("Media", "Feed", new { id = media.Id })" loading="lazy" alt="Opslagsbillede" />
+                        <img src="@Url.Action("Media", "Feed", new { id = media.Id })" loading="lazy" alt="@T("Opslagsbillede")" />
                     }
                     @if (isOverlayTile)
                     {
@@ -104,8 +104,8 @@
         <div class="feed-avatar feed-avatar-sm">
             <i class="bi bi-person-circle"></i>
         </div>
-        <input type="text" name="Body" class="feed-comment-input" placeholder="Skriv en kommentar..." maxlength="1000" required />
-        <button type="submit" class="feed-comment-send" title="Send" aria-label="Send">
+        <input type="text" name="Body" class="feed-comment-input" placeholder="@T("Skriv en kommentar...")" maxlength="1000" required />
+        <button type="submit" class="feed-comment-send" title="@T("Send")" aria-label="@T("Send")">
             <i class="bi bi-send"></i>
         </button>
     </form>
