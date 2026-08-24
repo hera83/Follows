@@ -60,6 +60,12 @@ namespace web.Infrastructure
         {
             if (string.IsNullOrWhiteSpace(danishText)) return danishText;
 
+            // Safe to call unconditionally, even for a Danish target - ToastTranslationFilter already
+            // skips calling this for a Danish viewer, but other callers (e.g. DocumentsService, for the
+            // "document already in target language" message - see its own comment for why that one can't
+            // go through the filter) call this directly and shouldn't each have to remember to guard it.
+            if (AppLanguages.Normalize(targetLanguageCode) == AppLanguages.Default) return danishText;
+
             var cacheKey = $"toast-translation:{targetLanguageCode}:{danishText}";
             if (_cache.TryGetValue(cacheKey, out string? cached) && cached is not null)
                 return cached;

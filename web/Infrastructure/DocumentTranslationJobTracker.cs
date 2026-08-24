@@ -31,6 +31,9 @@ namespace web.Infrastructure
         public string? Html { get; set; }
         public bool Truncated { get; set; }
 
+        /// <summary>Info/warning toast text for AlreadyInTargetLanguage or Truncated, already translated to the viewer's profile language — see TranslateDocumentResponseDto.Message for why this is built server-side.</summary>
+        public string? Message { get; set; }
+
         public DateTime CreatedAtUtc { get; init; } = DateTime.UtcNow;
     }
 

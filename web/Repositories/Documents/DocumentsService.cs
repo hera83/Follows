@@ -17,6 +17,7 @@ namespace web.Repositories.Documents
         private readonly ILogger<DocumentsService> _logger;
         private readonly LanguageTools _language;
         private readonly IAiGatewayConfigurationProvider _aiGatewayConfigurationProvider;
+        private readonly IToastTranslationService _toastTranslator;
 
         public DocumentsService(
             ApplicationDbContext context,
@@ -24,7 +25,8 @@ namespace web.Repositories.Documents
             IConfiguration config,
             ILogger<DocumentsService> logger,
             IAiGatewayService aiGatewayService,
-            IAiGatewayConfigurationProvider aiGatewayConfigurationProvider)
+            IAiGatewayConfigurationProvider aiGatewayConfigurationProvider,
+            IToastTranslationService toastTranslator)
         {
             _context = context;
             _env = env;
@@ -32,6 +34,7 @@ namespace web.Repositories.Documents
             _logger = logger;
             _language = aiGatewayService.Language(aiGatewayConfigurationProvider);
             _aiGatewayConfigurationProvider = aiGatewayConfigurationProvider;
+            _toastTranslator = toastTranslator;
         }
 
         public async Task<List<DocumentGroupDto>> GetGroupsAsync(CancellationToken ct = default)
@@ -394,7 +397,8 @@ namespace web.Repositories.Documents
                 {
                     Success = true,
                     AlreadyInTargetLanguage = true,
-                    TargetLanguageName = targetNative
+                    TargetLanguageName = targetNative,
+                    Message = await _toastTranslator.TranslateAsync($"Dokumentet er allerede på {targetNative}.", targetLanguageCode, ct)
                 };
             }
 
@@ -488,7 +492,12 @@ namespace web.Repositories.Documents
                 Success = true,
                 Html = MarkdownRenderer.ToSafeHtml(markdown),
                 TargetLanguageName = targetNative,
-                Truncated = truncated
+                Truncated = truncated,
+                Message = truncated
+                    ? await _toastTranslator.TranslateAsync(
+                        "Dokumentet var langt og blev afkortet før oversættelse — enkelte afsnit mangler muligvis.",
+                        targetLanguageCode, ct)
+                    : null
             };
         }
 

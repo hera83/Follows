@@ -408,7 +408,12 @@
                     }
 
                     if (data.alreadyInTargetLanguage) {
-                        FvToast.show('info', `Dokumentet er allerede på ${data.targetLanguageName}.`);
+                        // data.message er allerede oversat til brugerens foretrukne sprog server-side (se
+                        // TranslateDocumentResponseDto.Message) — bygges IKKE her i JS ud fra
+                        // targetLanguageName, for så ville teksten altid blive på dansk uanset brugerens
+                        // sprogindstilling (ingen {success, message, type}-formet JSON-response for
+                        // ToastTranslationFilter at oversætte i stedet).
+                        FvToast.show('info', data.message || `Dokumentet er allerede på ${data.targetLanguageName}.`);
                         return;
                     }
 
@@ -417,7 +422,9 @@
                     setTranslateButtonMode(true); // knappen bliver til "Genoversæt" — næste klik tvinger en frisk oversættelse igennem
 
                     if (data.truncated) {
-                        FvToast.show('warning', 'Dokumentet var langt og blev afkortet før oversættelse — enkelte afsnit mangler muligvis.');
+                        // Se kommentaren ved alreadyInTargetLanguage ovenfor - samme grund til at bruge
+                        // data.message frem for en hårdkodet dansk streng her.
+                        FvToast.show('warning', data.message || 'Dokumentet var langt og blev afkortet før oversættelse — enkelte afsnit mangler muligvis.');
                     }
                 } catch {
                     FvToast.show('error', 'Netværksfejl. Prøv igen.');
