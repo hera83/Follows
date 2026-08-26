@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<!--
+  Offline fallback for the installable PWA shell (see sw.js). Deliberately fully self-contained
+  (inline styles only, no site.css/theme.css) — those are dynamic/server-rendered and may not be
+  available from the cache while offline, but this page must still render correctly without them.
+-->
+<html lang="da">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Follows</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+        :root { color-scheme: light dark; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1.5rem;
+            font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+            background: light-dark(#f0f2f5, #0d1117);
+            color: light-dark(#111827, #e6edf3);
+            text-align: center;
+        }
+        .icon { font-size: 2.75rem; color: #c94e24; margin-bottom: 0.75rem; }
+        h1 { font-size: 1.15rem; margin: 0 0 0.5rem; }
+        p { margin: 0 0 1.5rem; color: light-dark(#4b5563, #7d8590); font-size: 0.9rem; }
+        button {
+            font: inherit;
+            padding: 0.6rem 1.25rem;
+            border-radius: 10px;
+            border: 1px solid light-dark(rgba(0,0,0,.15), rgba(255,255,255,.15));
+            background: #c94e24;
+            color: #fff;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <div class="icon">&#128268;</div>
+        <h1>Ingen forbindelse</h1>
+        <p>Follows kan ikke n&aring;s lige nu. Tjek din internetforbindelse og pr&oslash;v igen.</p>
+        <button onclick="location.reload()">Pr&oslash;v igen</button>
+    </div>
+</body>
+</html>

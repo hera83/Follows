@@ -168,6 +168,28 @@
             </div>
         </div>
 
+        <!--
+            Installer app — deliberately only ever shown in the desktop shell (this view is shared
+            with the PWA shell - see PwaShellMiddleware/_AppShellLayout.cshtml). The installed app
+            itself never shows any install UI; the script below hides this card entirely there.
+        -->
+        <div class="card d-none" id="pwaInstallCard">
+            <div class="card-header">
+                <i class="bi bi-phone"></i> @T("Installer app")
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">@T("Installer Follows som app på din enhed for hurtig adgang til Feeds, Documents og din profil.")</p>
+
+                <button type="button" class="btn btn-primary d-none" id="pwaInstallBtn" data-pwa-state="button">
+                    <i class="bi bi-download me-1"></i> @T("Installer")
+                </button>
+
+                <p class="mb-0 d-none" data-pwa-state="ios">
+                    <i class="bi bi-share me-1"></i> @T("Tryk på Del-ikonet i din browser, og vælg \"Føj til hjemmeskærm\".")
+                </p>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -498,6 +520,45 @@
                     cameraModalEl.removeEventListener('hidden.bs.modal', onHidden);
                     openCropper(dataUrl);
                 });
+            });
+        })();
+    </script>
+
+    <script>
+        (() => {
+            // "Installer app" — only ever shown in the desktop shell. A page needs its own
+            // <link rel="manifest"> for the browser to consider IT installable, and only
+            // _AppShellLayout.cshtml links one (_Layout.cshtml is never touched) — so a native
+            // install prompt can only ever fire on an "/app/..." page, never here. Clicking the
+            // button below hands off to the PWA shell and asks it to trigger that prompt
+            // automatically on arrival (see the small script in _AppShellLayout.cshtml) — the
+            // installed app itself shows no install UI of its own.
+            const card = document.getElementById('pwaInstallCard');
+            if (!card) return;
+
+            const hasManifest = !!document.querySelector('link[rel="manifest"]');
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+            if (hasManifest || isStandalone) return; // inside (or already running as) the PWA shell
+
+            const showState = (name) => {
+                card.classList.remove('d-none');
+                card.querySelectorAll('[data-pwa-state]').forEach((el) => {
+                    el.classList.toggle('d-none', el.dataset.pwaState !== name);
+                });
+            };
+
+            const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) && !window.MSStream;
+            if (isIOS) {
+                // Safari never supports an automatic install prompt - only the manual "Add to Home
+                // Screen" gesture.
+                showState('ios');
+                return;
+            }
+
+            showState('button');
+            document.getElementById('pwaInstallBtn')?.addEventListener('click', () => {
+                sessionStorage.setItem('pwaInstallRequested', '1');
+                location.href = '/app/Profile';
             });
         })();
     </script>

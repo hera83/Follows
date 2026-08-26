@@ -1,0 +1,162 @@
+@using web.Data
+@using web.Data.Entities
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@{
+    // Standalone shell for the installable PWA ("/app/..." — see PwaShellMiddleware), scoped to
+    // Feeds/Documents/Min Profil only. Deliberately does NOT extend/reuse _Layout.cshtml (which must
+    // stay completely untouched) — this is its own <html> document, mirroring the theme-resolution
+    // logic in _Layout.cshtml so both shells always render the same light/dark theme for the same
+    // viewer, and reusing site.css/theme.css unmodified for every shared component (cards, buttons,
+    // forms, feed/document components, toasts, modals). Only the chrome below (top bar + collapsible
+    // menu panel) is new, styled entirely from pwa-shell.css under its own "pwa-*" class namespace so
+    // nothing here can collide with — or need any change to — the desktop sidebar's CSS.
+    var currentUser = await UserManager.GetUserAsync(User);
+    var currentUserId = currentUser?.Id;
+    var hasAvatar = currentUser?.ProfilePictureId.HasValue == true;
+
+    var themeMode = currentUser?.ThemePreference;
+    if (string.IsNullOrEmpty(themeMode))
+    {
+        themeMode = await Db.AppSettings
+            .AsNoTracking()
+            .Where(s => s.Key == AppSettingKeys.ActiveThemeMode)
+            .Select(s => s.Value)
+            .FirstOrDefaultAsync() ?? ThemeMode.System;
+    }
+}
+<!DOCTYPE html>
+<html lang="da" data-theme-mode="@themeMode">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Follows</title>
+    <link rel="icon" type="image/svg+xml" href="~/favicon.svg" />
+    <link rel="alternate icon" href="~/favicon.ico" />
+    <link rel="apple-touch-icon" href="~/apple-touch-icon.png" />
+    <link rel="manifest" href="~/manifest.webmanifest" />
+    <meta name="theme-color" content="#c94e24" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Follows" />
+    <script>
+        (function () {
+            var mode = (document.documentElement.dataset.themeMode || 'system').toLowerCase();
+            var theme;
+            if (mode === 'light') { theme = 'light'; }
+            else if (mode === 'dark') { theme = 'dark'; }
+            else { theme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'; }
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+    <script type="importmap"></script>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" id="themeStylesheet" href="~/theme.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/pwa-shell.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="pwa-shell" id="pwaShell">
+        <header class="pwa-topbar">
+            <span class="pwa-topbar-brand">
+                <i class="bi bi-chat-heart-fill"></i>
+                <span>Follows</span>
+            </span>
+            <button id="pwaMenuToggle" class="pwa-menu-toggle" type="button"
+                    aria-label="@T("Åbn menu")" aria-expanded="false" aria-controls="pwaMenuPanel">
+                <i class="bi bi-list"></i>
+            </button>
+        </header>
+
+        <div id="pwaMenuBackdrop" class="pwa-menu-backdrop"></div>
+
+        <nav id="pwaMenuPanel" class="pwa-menu-panel" aria-label="@T("Hovedmenu")">
+            <a class="pwa-nav-link" href="/app/Feed" title="@T("Feeds")">
+                <span class="pwa-nav-icon"><i class="bi bi-images"></i></span>
+                <span class="pwa-nav-text">@T("Feeds")</span>
+            </a>
+            <a class="pwa-nav-link" href="/app/Documents" title="@T("Documents")">
+                <span class="pwa-nav-icon"><i class="bi bi-folder2-open"></i></span>
+                <span class="pwa-nav-text">@T("Documents")</span>
+            </a>
+            <a class="pwa-nav-link" href="/app/Profile" title="@T("Min Profil")">
+                <span class="pwa-nav-icon" id="pwaAvatarWrapper">
+                    @if (hasAvatar && currentUserId is not null)
+                    {
+                        <img src="@Url.Action("Avatar", "Profile", new { userId = currentUserId })"
+                             class="pwa-nav-avatar" alt="@T("Profilbillede")" />
+                    }
+                    else
+                    {
+                        <i class="bi bi-person-circle"></i>
+                    }
+                </span>
+                <span class="pwa-nav-text">@T("Min Profil")</span>
+            </a>
+
+            <hr class="pwa-menu-divider" />
+
+            <form asp-controller="Account" asp-action="Logout" method="post" class="pwa-menu-form">
+                <button type="submit" class="pwa-nav-link pwa-nav-logout w-100" title="@T("Log ud")">
+                    <span class="pwa-nav-icon"><i class="bi bi-box-arrow-right"></i></span>
+                    <span class="pwa-nav-text">@T("Log ud")</span>
+                </button>
+            </form>
+        </nav>
+
+        <div class="pwa-content">
+            @await Html.PartialAsync("~/Views/Shared/Partials/_Toast.cshtml")
+            @RenderBody()
+        </div>
+    </div>
+
+    <script>
+        window.i18n = @JsCatalogJson();
+        window.appLocale = '@web.Constants.AppLanguages.GetLocaleTag(CurrentLanguage)';
+    </script>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/data-table.js" asp-append-version="true"></script>
+    <script src="~/js/chat.js" asp-append-version="true"></script>
+    <script src="~/js/pwa-shell.js" asp-append-version="true"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                // Scope narrowed to "/app/" so it can never intercept requests for the desktop app.
+                navigator.serviceWorker.register('/sw.js', { scope: '/app/' }).catch(function () {
+                    // Installability/offline-fallback simply won't be available - the shell itself
+                    // still works fully online without a registered service worker.
+                });
+            });
+        }
+    </script>
+    <script>
+        (function () {
+            // Headless — the PWA shell never shows its own install button (that lives only on the
+            // desktop Min Profil page, see Profile/Index.cshtml). This only auto-triggers the native
+            // install prompt when the desktop "Installer" button sent the viewer here to do exactly
+            // that; otherwise it just quietly captures the event in case it's needed.
+            var deferredPrompt = null;
+
+            var tryAutoPrompt = function () {
+                if (!deferredPrompt) return;
+                if (sessionStorage.getItem('pwaInstallRequested') !== '1') return;
+                sessionStorage.removeItem('pwaInstallRequested');
+                deferredPrompt.prompt();
+                deferredPrompt = null;
+            };
+
+            window.addEventListener('beforeinstallprompt', function (e) {
+                e.preventDefault();
+                deferredPrompt = e;
+                tryAutoPrompt();
+            });
+        })();
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -3,6 +3,7 @@ using Serilog.Events;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.WebUtilities;
 using web.Data;
 using web.Data.Entities;
 using web.Constants;
@@ -92,6 +93,25 @@ try
         options.LogoutPath = "/Account/Logout";
         options.AccessDeniedPath = "/Account/AccessDenied";
         options.SlidingExpiration = true;
+
+        // Mirrors the default OnRedirectToLogin, except: when the request came in through the PWA's
+        // "/app/..." URL space (see PwaShellMiddleware), that middleware has already rewritten
+        // context.Request.Path to the plain route shape before this challenge fires - so the default
+        // logic would build a ReturnUrl pointing at the plain (non-"/app") URL, silently dropping the
+        // user out of the installed-app shell after login. Substitute the original "/app/..." path when
+        // it's present so the post-login redirect (AccountController.Login -> Url.IsLocalUrl(returnUrl))
+        // lands back inside the PWA shell.
+        options.Events.OnRedirectToLogin = context =>
+        {
+            var originalPath = context.HttpContext.Items["PwaOriginalPath"] as string;
+            var returnUrl = originalPath is not null
+                ? originalPath + context.Request.QueryString
+                : context.Request.PathBase + context.Request.Path + context.Request.QueryString;
+
+            var loginUrl = context.Request.PathBase + options.LoginPath;
+            context.Response.Redirect(QueryHelpers.AddQueryString(loginUrl, "ReturnUrl", returnUrl));
+            return Task.CompletedTask;
+        };
     });
 
     // Add authorization policies
@@ -192,6 +212,12 @@ try
     app.UseForwardedHeaders(forwardedHeadersOptions);
 
     app.UseHttpsRedirection();
+
+    // Rewrites "/app/..." (the installable PWA's URL space) to the plain route shape before routing
+    // runs - see PwaShellMiddleware for why this must run before UseRouting() and why it's a rewrite
+    // rather than a second registered route.
+    app.UsePwaShell();
+
     app.UseRouting();
 
     // First user setup redirect

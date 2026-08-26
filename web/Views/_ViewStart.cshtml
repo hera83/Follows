@@ -1,4 +1,11 @@
 ﻿@{
     var isAjax = Context.Request.Headers["X-Ajax-Navigation"].ToString() == "true";
-    Layout = isAjax ? "~/Views/Shared/_AjaxLayout.cshtml" : "_Layout";
+    // Set by PwaShellMiddleware for requests that came in through the "/app/..." URL space (the
+    // installable PWA scoped to Feeds/Documents/Min Profil) - see that class for details.
+    var isPwaShell = Context.Items["PwaShell"] is true;
+    Layout = isAjax
+        ? "~/Views/Shared/_AjaxLayout.cshtml"
+        : isPwaShell
+            ? "~/Views/Shared/_AppShellLayout.cshtml"
+            : "_Layout";
 }

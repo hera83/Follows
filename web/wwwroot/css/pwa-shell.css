@@ -1,0 +1,166 @@
+/* ═══════════════════════════════════════════════════════════════
+   Follows — PWA shell chrome (Feeds / Documents / Min Profil)
+   Loaded only by _AppShellLayout.cshtml, alongside the unmodified site.css/theme.css - every class
+   here is under its own "pwa-*" namespace (none of it exists in site.css) so this file can never
+   collide with, or need any change to, the desktop sidebar styling in site.css. Reuses the same
+   CSS custom properties (--clr-*, --radius-*, --shadow-card, --sb-speed/--sb-ease) site.css/theme.css
+   already define, so both shells always share one design system.
+   ═══════════════════════════════════════════════════════════════ */
+
+.pwa-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--clr-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Top bar — the only chrome visible by default ── */
+.pwa-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 210;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
+  padding-top: calc(0.65rem + env(safe-area-inset-top));
+  background: var(--clr-surface);
+  border-bottom: 1px solid var(--clr-border);
+}
+
+.pwa-topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--clr-text);
+}
+
+.pwa-topbar-brand i {
+  font-size: 1.2rem;
+  color: var(--clr-brand);
+}
+
+/* ── The single discreet toggle — everything else stays hidden until opened ── */
+.pwa-menu-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-md);
+  background: var(--clr-surface-2);
+  color: var(--clr-text);
+  font-size: 1.15rem;
+  cursor: pointer;
+}
+
+.pwa-menu-toggle:hover { border-color: var(--clr-border-hover); }
+
+/* ── Backdrop behind the open panel ── */
+.pwa-menu-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 219;
+  background: rgba(0, 0, 0, .5);
+}
+
+/* ── Collapsible panel — off-canvas, closed by default ── */
+.pwa-menu-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 220;
+  width: min(300px, 85vw);
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 1rem;
+  padding-top: calc(1rem + env(safe-area-inset-top));
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  background: var(--clr-surface);
+  border-left: 1px solid var(--clr-border);
+  box-shadow: -8px 0 28px rgba(0, 0, 0, .4);
+  transform: translateX(100%);
+  transition: transform var(--sb-speed) var(--sb-ease);
+}
+
+.pwa-shell.pwa-menu-open .pwa-menu-backdrop { display: block; }
+.pwa-shell.pwa-menu-open .pwa-menu-panel { transform: translateX(0); }
+
+.pwa-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.7rem 0.75rem;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--clr-text);
+  font-size: 0.925rem;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.pwa-nav-link:hover,
+.pwa-nav-link:focus-visible {
+  background: var(--clr-brand-dim);
+  color: var(--clr-brand);
+  text-decoration: none;
+}
+
+.pwa-nav-link.active { background: var(--clr-brand-dim); color: var(--clr-brand); }
+
+.pwa-nav-icon {
+  flex-shrink: 0;
+  width: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+.pwa-nav-avatar {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.pwa-nav-text { white-space: nowrap; }
+
+.pwa-menu-divider {
+  border: none;
+  border-top: 1px solid var(--clr-border);
+  margin: 0.4rem 0;
+}
+
+.pwa-menu-form { margin: 0; }
+
+.pwa-nav-logout:hover,
+.pwa-nav-logout:focus-visible { background: var(--clr-alarm-bg); color: var(--clr-alarm); }
+
+/* ── Content — the primary screen space ── */
+.pwa-content {
+  flex: 1;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem calc(3rem + env(safe-area-inset-bottom));
+}
+
+@media (max-width: 480px) {
+  .pwa-content { padding: 1rem 0.85rem calc(2rem + env(safe-area-inset-bottom)); }
+
+  #toast-container { top: calc(0.75rem + env(safe-area-inset-top)); left: 0.75rem; right: 0.75rem; }
+  .fv-toast { min-width: 0; max-width: none; width: 100%; }
+}
