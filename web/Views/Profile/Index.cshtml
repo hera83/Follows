@@ -557,8 +557,9 @@
 
             showState('button');
             document.getElementById('pwaInstallBtn')?.addEventListener('click', () => {
-                sessionStorage.setItem('pwaInstallRequested', '1');
-                location.href = '/app/Profile';
+                // A query param survives an http->https scheme redirect (a different origin) on the
+                // way there — sessionStorage/a cookie set here would not.
+                location.href = '/app/Profile?installRequested=1';
             });
         })();
     </script>

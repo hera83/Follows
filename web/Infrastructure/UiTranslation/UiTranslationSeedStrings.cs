@@ -28,6 +28,7 @@ namespace web.Infrastructure.UiTranslation
             "Administrer dine personlige oplysninger og profilbillede",
             "Alle dokumenter i gruppen slettes også. Denne handling kan ikke fortrydes.",
             "Annuller",
+            "Appen kunne ikke installeres automatisk. Tjek at siden bruges via https, og prøv evt. \"Installer app\" i browserens egen menu.",
             "Bekræft nyt kodeord",
             "Bekræft sletning",
             "Besked",

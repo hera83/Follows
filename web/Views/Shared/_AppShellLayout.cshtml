@@ -139,16 +139,40 @@
             // Headless — the PWA shell never shows its own install button (that lives only on the
             // desktop Min Profil page, see Profile/Index.cshtml). This only auto-triggers the native
             // install prompt when the desktop "Installer" button sent the viewer here to do exactly
-            // that; otherwise it just quietly captures the event in case it's needed.
+            // that (flagged via a query param, not sessionStorage/a cookie — those don't reliably
+            // survive an http->https scheme redirect, i.e. a different origin, which query strings
+            // do); otherwise it just quietly captures the event in case it's needed.
+            var params = new URLSearchParams(location.search);
+            var installRequested = params.get('installRequested') === '1';
+
+            if (installRequested) {
+                // Strip the flag from the visible/shareable URL right away.
+                params.delete('installRequested');
+                var rest = params.toString();
+                history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
+            }
+
             var deferredPrompt = null;
 
             var tryAutoPrompt = function () {
-                if (!deferredPrompt) return;
-                if (sessionStorage.getItem('pwaInstallRequested') !== '1') return;
-                sessionStorage.removeItem('pwaInstallRequested');
+                if (!deferredPrompt || !installRequested) return;
+                installRequested = false;
                 deferredPrompt.prompt();
                 deferredPrompt = null;
             };
+
+            if (installRequested) {
+                // The browser computes installability asynchronously; give it a few seconds before
+                // concluding it isn't going to fire "beforeinstallprompt" at all - most commonly
+                // because the page isn't a secure context (plain http, not https/localhost - the
+                // service worker registration above silently fails there), the app is already
+                // installed, or the browser's own install heuristics haven't been met yet.
+                setTimeout(function () {
+                    if (installRequested) {
+                        window.FvToast?.show('warning', @TJs("Appen kunne ikke installeres automatisk. Tjek at siden bruges via https, og prøv evt. \"Installer app\" i browserens egen menu."));
+                    }
+                }, 4000);
+            }
 
             window.addEventListener('beforeinstallprompt', function (e) {
                 e.preventDefault();
