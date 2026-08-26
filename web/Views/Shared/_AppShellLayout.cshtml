@@ -128,13 +128,14 @@
             // Headless in the normal case — the PWA shell never shows its own install button (that
             // lives only on the desktop Min Profil page, see Profile/Index.cshtml). This:
             //   1) registers the service worker (required for installability at all),
-            //   2) auto-triggers the native install prompt when the desktop "Installer" button sent
-            //      the viewer here to do exactly that (flagged via a query param, not sessionStorage/a
-            //      cookie — those don't reliably survive an http->https scheme redirect, i.e. a
-            //      different origin, which query strings do),
-            //   3) if that was requested but doesn't end up working, renders a short diagnostic panel
-            //      right on the page (a phone rarely has devtools open) explaining exactly which
-            //      installability precondition failed, instead of just doing nothing silently.
+            //   2) auto-triggers the native install prompt whenever the browser offers one, if the
+            //      desktop "Installer" button sent the viewer here to do exactly that (flagged via a
+            //      query param, not sessionStorage/a cookie — those don't reliably survive an
+            //      http->https scheme redirect, i.e. a different origin, which query strings do),
+            //   3) since "beforeinstallprompt" is unreliable in practice (browser engagement
+            //      heuristics, a cooldown after an earlier dismissal, or simply not supported at all
+            //      on some browsers) - immediately shows reliable manual "how to install" steps too,
+            //      instead of leaving the viewer with nothing if the automatic path doesn't fire.
             var params = new URLSearchParams(location.search);
             var installRequested = params.get('installRequested') === '1';
 
@@ -147,16 +148,24 @@
 
             var deferredPrompt = null;
             var promptFired = false;
+            var autoPromptDone = false;
+
+            var tryAutoPrompt = function () {
+                if (autoPromptDone || !installRequested || !deferredPrompt) return;
+                autoPromptDone = true;
+                deferredPrompt.prompt();
+                deferredPrompt = null;
+            };
 
             window.addEventListener('beforeinstallprompt', function (e) {
                 e.preventDefault();
                 deferredPrompt = e;
                 promptFired = true;
-                if (installRequested) {
-                    installRequested = false;
-                    deferredPrompt.prompt();
-                    deferredPrompt = null;
-                }
+                tryAutoPrompt();
+            });
+
+            window.addEventListener('appinstalled', function () {
+                document.getElementById('pwaInstallHelp')?.remove();
             });
 
             var swSupported = 'serviceWorker' in navigator;
@@ -171,17 +180,31 @@
 
             if (!installRequested) return;
 
+            // Reliable path: show manual steps right away rather than wait and hope.
+            var isEdge = /EdgA\//.test(navigator.userAgent);
+            var steps = isEdge
+                ? @TJs("Tryk på menuen (⋯) i Edge, og vælg \"Tilføj til telefon\" eller \"Installer app\".")
+                : @TJs("Tryk på menuen (⋮) i browseren, og vælg \"Installer app\" eller \"Føj til startskærm\".");
+
+            var help = document.createElement('div');
+            help.className = 'card mb-4';
+            help.id = 'pwaInstallHelp';
+            help.innerHTML =
+                '<div class="card-header"><i class="bi bi-phone"></i> ' + @TJs("Sådan installerer du appen") + '</div>' +
+                '<div class="card-body"><p class="mb-0"></p></div>';
+            help.querySelector('p').textContent = steps;
+
+            var content = document.querySelector('.pwa-content');
+            content && content.insertBefore(help, content.firstChild);
+
             var manifestPromise = fetch('/manifest.webmanifest')
                 .then(function (r) { return { status: r.status, ok: r.ok }; })
                 .catch(function (err) { return { status: null, ok: false, error: (err && err.message) || String(err) }; });
 
             Promise.allSettled([swPromise, manifestPromise]).then(function (results) {
-                // The browser evaluates installability asynchronously - give it a few seconds before
-                // concluding "beforeinstallprompt" isn't coming and reporting why.
+                // The browser evaluates installability asynchronously - give it a good while before
+                // reporting what it decided (it can take several seconds, sometimes longer).
                 setTimeout(function () {
-                    if (!installRequested) return; // the prompt did fire and was handled above
-                    installRequested = false;
-
                     var manifestResult = results[1].value || {};
                     var check = function (pass) { return pass ? '✅' : '❌'; };
 
@@ -194,18 +217,25 @@
                         lines.push(check(swOk === true) + ' Service worker registreret: ' + (swOk === true ? 'ja' : ('NEJ — ' + swError)));
                     }
                     lines.push(check(manifestResult.ok) + ' Manifest hentet: ' + (manifestResult.ok ? 'ja' : ('NEJ — status ' + (manifestResult.status ?? manifestResult.error))));
-                    lines.push(check(promptFired) + ' Browseren tilbød installation: ' + (promptFired ? 'ja' : 'nej'));
+                    lines.push(check(promptFired) + ' Browseren tilbød automatisk installation: ' + (promptFired ? 'ja' : 'nej (brug de manuelle trin ovenfor)'));
+                    lines.push('URL: ' + location.href);
+                    lines.push('User-Agent: ' + navigator.userAgent);
 
                     var panel = document.createElement('div');
                     panel.className = 'card mb-4';
                     panel.innerHTML =
                         '<div class="card-header"><i class="bi bi-bug"></i> Installations-diagnose</div>' +
-                        '<div class="card-body"><pre style="white-space:pre-wrap;font-size:.8rem;margin:0;"></pre></div>';
+                        '<div class="card-body"><pre style="white-space:pre-wrap;word-break:break-word;font-size:.75rem;margin:0;"></pre></div>';
                     panel.querySelector('pre').textContent = lines.join('\n');
 
-                    var content = document.querySelector('.pwa-content');
-                    content && content.insertBefore(panel, content.firstChild);
-                }, 3500);
+                    var help2 = document.getElementById('pwaInstallHelp');
+                    if (help2 && help2.parentNode) {
+                        help2.parentNode.insertBefore(panel, help2.nextSibling);
+                    } else {
+                        var content2 = document.querySelector('.pwa-content');
+                        content2 && content2.insertBefore(panel, content2.firstChild);
+                    }
+                }, 6000);
             });
         })();
     </script>
