@@ -124,24 +124,17 @@
     <script src="~/js/chat.js" asp-append-version="true"></script>
     <script src="~/js/pwa-shell.js" asp-append-version="true"></script>
     <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function () {
-                // Scope narrowed to "/app/" so it can never intercept requests for the desktop app.
-                navigator.serviceWorker.register('/sw.js', { scope: '/app/' }).catch(function () {
-                    // Installability/offline-fallback simply won't be available - the shell itself
-                    // still works fully online without a registered service worker.
-                });
-            });
-        }
-    </script>
-    <script>
         (function () {
-            // Headless — the PWA shell never shows its own install button (that lives only on the
-            // desktop Min Profil page, see Profile/Index.cshtml). This only auto-triggers the native
-            // install prompt when the desktop "Installer" button sent the viewer here to do exactly
-            // that (flagged via a query param, not sessionStorage/a cookie — those don't reliably
-            // survive an http->https scheme redirect, i.e. a different origin, which query strings
-            // do); otherwise it just quietly captures the event in case it's needed.
+            // Headless in the normal case — the PWA shell never shows its own install button (that
+            // lives only on the desktop Min Profil page, see Profile/Index.cshtml). This:
+            //   1) registers the service worker (required for installability at all),
+            //   2) auto-triggers the native install prompt when the desktop "Installer" button sent
+            //      the viewer here to do exactly that (flagged via a query param, not sessionStorage/a
+            //      cookie — those don't reliably survive an http->https scheme redirect, i.e. a
+            //      different origin, which query strings do),
+            //   3) if that was requested but doesn't end up working, renders a short diagnostic panel
+            //      right on the page (a phone rarely has devtools open) explaining exactly which
+            //      installability precondition failed, instead of just doing nothing silently.
             var params = new URLSearchParams(location.search);
             var installRequested = params.get('installRequested') === '1';
 
@@ -153,31 +146,66 @@
             }
 
             var deferredPrompt = null;
-
-            var tryAutoPrompt = function () {
-                if (!deferredPrompt || !installRequested) return;
-                installRequested = false;
-                deferredPrompt.prompt();
-                deferredPrompt = null;
-            };
-
-            if (installRequested) {
-                // The browser computes installability asynchronously; give it a few seconds before
-                // concluding it isn't going to fire "beforeinstallprompt" at all - most commonly
-                // because the page isn't a secure context (plain http, not https/localhost - the
-                // service worker registration above silently fails there), the app is already
-                // installed, or the browser's own install heuristics haven't been met yet.
-                setTimeout(function () {
-                    if (installRequested) {
-                        window.FvToast?.show('warning', @TJs("Appen kunne ikke installeres automatisk. Tjek at siden bruges via https, og prøv evt. \"Installer app\" i browserens egen menu."));
-                    }
-                }, 4000);
-            }
+            var promptFired = false;
 
             window.addEventListener('beforeinstallprompt', function (e) {
                 e.preventDefault();
                 deferredPrompt = e;
-                tryAutoPrompt();
+                promptFired = true;
+                if (installRequested) {
+                    installRequested = false;
+                    deferredPrompt.prompt();
+                    deferredPrompt = null;
+                }
+            });
+
+            var swSupported = 'serviceWorker' in navigator;
+            var swOk = null, swError = null;
+
+            // Scope narrowed to "/app/" so it can never intercept requests for the desktop app.
+            var swPromise = swSupported
+                ? navigator.serviceWorker.register('/sw.js', { scope: '/app/' })
+                    .then(function () { swOk = true; })
+                    .catch(function (err) { swOk = false; swError = (err && err.message) || String(err); })
+                : Promise.resolve();
+
+            if (!installRequested) return;
+
+            var manifestPromise = fetch('/manifest.webmanifest')
+                .then(function (r) { return { status: r.status, ok: r.ok }; })
+                .catch(function (err) { return { status: null, ok: false, error: (err && err.message) || String(err) }; });
+
+            Promise.allSettled([swPromise, manifestPromise]).then(function (results) {
+                // The browser evaluates installability asynchronously - give it a few seconds before
+                // concluding "beforeinstallprompt" isn't coming and reporting why.
+                setTimeout(function () {
+                    if (!installRequested) return; // the prompt did fire and was handled above
+                    installRequested = false;
+
+                    var manifestResult = results[1].value || {};
+                    var check = function (pass) { return pass ? '✅' : '❌'; };
+
+                    var lines = [
+                        check(window.isSecureContext) + ' Sikker forbindelse (https eller localhost): ' +
+                            (window.isSecureContext ? 'ja' : 'NEJ — installation er kun muligt over https eller localhost'),
+                        check(swSupported) + ' Service worker understøttet af browseren: ' + (swSupported ? 'ja' : 'nej'),
+                    ];
+                    if (swSupported) {
+                        lines.push(check(swOk === true) + ' Service worker registreret: ' + (swOk === true ? 'ja' : ('NEJ — ' + swError)));
+                    }
+                    lines.push(check(manifestResult.ok) + ' Manifest hentet: ' + (manifestResult.ok ? 'ja' : ('NEJ — status ' + (manifestResult.status ?? manifestResult.error))));
+                    lines.push(check(promptFired) + ' Browseren tilbød installation: ' + (promptFired ? 'ja' : 'nej'));
+
+                    var panel = document.createElement('div');
+                    panel.className = 'card mb-4';
+                    panel.innerHTML =
+                        '<div class="card-header"><i class="bi bi-bug"></i> Installations-diagnose</div>' +
+                        '<div class="card-body"><pre style="white-space:pre-wrap;font-size:.8rem;margin:0;"></pre></div>';
+                    panel.querySelector('pre').textContent = lines.join('\n');
+
+                    var content = document.querySelector('.pwa-content');
+                    content && content.insertBefore(panel, content.firstChild);
+                }, 3500);
             });
         })();
     </script>
