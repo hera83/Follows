@@ -41,11 +41,24 @@
                      "Billede/video"-knappen ovenfor dækker fortsat galleri-valg af flere filer/video. -->
                 <input type="file" id="feedComposerCameraInput" class="d-none"
                        accept="image/jpeg,image/png,image/webp" capture="environment" />
+                <!-- Samme trick som feedComposerCameraInput, men med video/*-accept: mobilens
+                     kamera-app åbner så direkte i videotilstand i stedet for foto. -->
+                <input type="file" id="feedComposerVideoInput" class="d-none"
+                       accept="video/mp4,video/webm,video/quicktime" capture="environment" />
 
                 <div class="feed-composer-toolbar">
-                    <button type="button" class="btn btn-secondary" id="feedComposerCameraBtn">
-                        <i class="bi bi-camera me-1"></i> @T("Tag billede")
-                    </button>
+                    <!-- "Tag billede"/"Optag video" slået sammen i én dropdown, så knapperne ikke
+                         fylder for meget på en smal telefonskærm; kun synlig på touch-enheder
+                         (se .feed-composer-camera-group i site.css). -->
+                    <div class="btn-group feed-composer-camera-group" id="feedComposerCameraGroup">
+                        <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-camera me-1"></i> @T("Kamera")
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><button type="button" class="dropdown-item" id="feedComposerCameraPhotoBtn"><i class="bi bi-camera me-2"></i>@T("Tag billede")</button></li>
+                            <li><button type="button" class="dropdown-item" id="feedComposerCameraVideoBtn"><i class="bi bi-camera-video me-2"></i>@T("Optag video")</button></li>
+                        </ul>
+                    </div>
                     <button type="button" class="btn btn-secondary" id="feedComposerAttachBtn">
                         <i class="bi bi-images me-1"></i> @T("Billede/video")
                     </button>
@@ -197,6 +210,7 @@
             const submitBtn = document.getElementById('feedComposerSubmitBtn');
             const fileInput = document.getElementById('feedComposerFileInput');
             const cameraInput = document.getElementById('feedComposerCameraInput');
+            const videoInput = document.getElementById('feedComposerVideoInput');
             const previewEl = document.getElementById('feedComposerPreview');
             let selectedFiles = [];
 
@@ -246,7 +260,8 @@
             };
 
             document.getElementById('feedComposerAttachBtn').addEventListener('click', () => fileInput.click());
-            document.getElementById('feedComposerCameraBtn').addEventListener('click', () => cameraInput.click());
+            document.getElementById('feedComposerCameraPhotoBtn').addEventListener('click', () => cameraInput.click());
+            document.getElementById('feedComposerCameraVideoBtn').addEventListener('click', () => videoInput.click());
 
             captionEl.addEventListener('input', () => { autoSize(captionEl); updateSubmitState(); });
 
@@ -281,6 +296,11 @@
                 // Nulstil, så det samme kamera-tag kan bruges igen (browseren udløser ellers ikke
                 // et nyt change-event, hvis "filen" ellers ville se identisk ud).
                 cameraInput.value = '';
+            });
+
+            videoInput.addEventListener('change', () => {
+                addFiles(Array.from(videoInput.files || []));
+                videoInput.value = '';
             });
 
             // ─── Shared, deduped fetch of one post's card HTML ──────────────────

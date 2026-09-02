@@ -1521,12 +1521,13 @@ input[type="file"]::-webkit-file-upload-button:hover {
   border-top: 1px solid var(--clr-border);
 }
 
-/* "Tag billede" bruger input[capture], som kun rigtige mobil-OS'er respekterer — på en
-   mus/tastatur-enhed (hover: hover, pointer: fine) åbner den samme filvælger som "Billede/video",
-   så den skjules der for ikke at fremstå som to identiske knapper. Vises på touch-enheder
-   (telefon/tablet), hvor den reelt sender brugeren direkte til kameraet. */
+/* "Kamera"-dropdownen (Tag billede/Optag video) bruger input[capture], som kun rigtige
+   mobil-OS'er respekterer — på en mus/tastatur-enhed (hover: hover, pointer: fine) åbner begge
+   punkter samme filvælger som "Billede/video", så gruppen skjules der for ikke at fremstå som en
+   overflødig dublet-knap. Vises på touch-enheder (telefon/tablet), hvor den reelt sender
+   brugeren direkte til kameraet. */
 @media (hover: hover) and (pointer: fine) {
-  #feedComposerCameraBtn { display: none; }
+  .feed-composer-camera-group { display: none; }
 }
 
 /* ── Empty state ── */
