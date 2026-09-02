@@ -55,7 +55,8 @@
     {
         var visibleCount = Math.Min(Model.Media.Count, 4);
         var extraCount = Model.Media.Count - visibleCount;
-        <div class="feed-media-grid" data-count="@visibleCount">
+        var allMediaJson = System.Text.Json.JsonSerializer.Serialize(Model.Media.Select(m => new { id = m.Id, video = m.IsVideo }));
+        <div class="feed-media-grid" data-count="@visibleCount" data-media='@Html.Raw(allMediaJson)'>
             @for (var i = 0; i < visibleCount; i++)
             {
                 var media = Model.Media[i];
@@ -77,6 +78,14 @@
                 </button>
             }
         </div>
+        @if (extraCount > 0)
+        {
+            <button type="button" class="feed-media-expand-btn"
+                    data-expand-label="@T("Vis alle billeder")" data-collapse-label="@T("Vis færre")">
+                <i class="bi bi-arrows-angle-expand"></i>
+                <span class="feed-media-expand-text">@T("Vis alle billeder")</span>
+            </button>
+        }
     }
 
     <div class="feed-post-actions">

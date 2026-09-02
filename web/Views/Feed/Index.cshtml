@@ -568,13 +568,55 @@
             let lightboxItems = [];
             let lightboxIndex = 0;
 
+            // Explicitly pause + drop the source instead of relying on innerHTML replacement to
+            // do it — that stops the in-flight download/buffering right away rather than letting
+            // it linger in the background while the next slide's video starts loading. The
+            // on-property handlers (rather than addEventListener) are cleared first so this
+            // intentional teardown can never be mistaken for a real playback error and clobber
+            // whatever slide gets rendered next.
+            const stopLightboxVideo = () => {
+                const playingVideo = lightboxContent.querySelector('video');
+                if (!playingVideo) return;
+                playingVideo.onerror = null;
+                playingVideo.onwaiting = null;
+                playingVideo.onplaying = null;
+                playingVideo.oncanplay = null;
+                playingVideo.pause();
+                playingVideo.removeAttribute('src');
+                playingVideo.load();
+            };
+
             const renderLightbox = () => {
-                const tile = lightboxItems[lightboxIndex];
-                if (!tile) return;
-                const mediaId = tile.dataset.mediaId;
-                lightboxContent.innerHTML = tile.classList.contains('feed-media-video')
-                    ? `<video src="/Feed/Media/${mediaId}" controls autoplay class="feed-lightbox-media"></video>`
-                    : `<img src="/Feed/Media/${mediaId}" class="feed-lightbox-media" alt="${@TJs("Billede")}" />`;
+                const item = lightboxItems[lightboxIndex];
+                if (!item) return;
+                stopLightboxVideo();
+
+                if (item.video) {
+                    // Fixed frame (see .feed-lightbox-video-frame in site.css) so the box never
+                    // resizes once metadata arrives. No autoplay — the viewer presses play
+                    // themselves; the spinner just reflects the video's own buffering state
+                    // (shown until enough has downloaded to play, and again if it stalls).
+                    lightboxContent.innerHTML = `
+                        <div class="feed-lightbox-video-frame">
+                            <video src="/Feed/Media/${item.id}" controls playsinline preload="auto"></video>
+                            <div class="feed-lightbox-video-buffering"><span class="spinner-border" role="status"></span></div>
+                        </div>`;
+                    const videoEl = lightboxContent.querySelector('video');
+                    const bufferingEl = lightboxContent.querySelector('.feed-lightbox-video-buffering');
+                    videoEl.loop = false; // play once — never restart on its own when it finishes
+                    videoEl.onended = () => { videoEl.pause(); videoEl.currentTime = 0; };
+                    videoEl.onwaiting = () => { bufferingEl.style.display = 'flex'; };
+                    videoEl.onplaying = () => { bufferingEl.style.display = 'none'; };
+                    videoEl.oncanplay = () => { bufferingEl.style.display = 'none'; };
+                    videoEl.onerror = () => {
+                        lightboxContent.innerHTML = `<div class="feed-lightbox-video-frame">
+                            <span class="feed-lightbox-video-error">${@TJs("Videoen kunne ikke indlæses.")}</span>
+                        </div>`;
+                    };
+                } else {
+                    lightboxContent.innerHTML = `<img src="/Feed/Media/${item.id}" class="feed-lightbox-image" alt="${@TJs("Billede")}" />`;
+                }
+
                 const showNav = lightboxItems.length > 1;
                 lightboxPrev.style.visibility = showNav ? 'visible' : 'hidden';
                 lightboxNext.style.visibility = showNav ? 'visible' : 'hidden';
@@ -582,14 +624,17 @@
 
             const openLightbox = (tileBtn) => {
                 const grid = tileBtn.closest('.feed-media-grid');
-                lightboxItems = Array.from(grid.querySelectorAll('.feed-media-item'));
-                lightboxIndex = lightboxItems.indexOf(tileBtn);
+                // Slide through every image/video in the post, not just the tiles actually
+                // rendered in the compact grid (the "+N" tile hides the rest of them).
+                lightboxItems = JSON.parse(grid.dataset.media || '[]');
+                lightboxIndex = parseInt(tileBtn.dataset.index, 10) || 0;
                 renderLightbox();
                 lightbox.classList.add('is-open');
                 lightbox.setAttribute('aria-hidden', 'false');
             };
 
             const closeLightbox = () => {
+                stopLightboxVideo();
                 lightbox.classList.remove('is-open');
                 lightbox.setAttribute('aria-hidden', 'true');
                 lightboxContent.innerHTML = '';
@@ -611,6 +656,41 @@
                 if (e.key === 'ArrowLeft') lightboxPrev.click();
                 if (e.key === 'ArrowRight') lightboxNext.click();
             });
+
+            // ─── Expand media grid (reveal the photos/videos hidden behind "+N") ──
+            const toggleMediaExpand = (btn) => {
+                const grid = btn.closest('.feed-post')?.querySelector('.feed-media-grid');
+                if (!grid) return;
+                const expandText = btn.querySelector('.feed-media-expand-text');
+                const icon = btn.querySelector('i');
+                const visibleCount = parseInt(grid.dataset.count, 10) || 4;
+
+                if (grid.classList.contains('is-expanded')) {
+                    Array.from(grid.querySelectorAll('.feed-media-item')).slice(visibleCount).forEach((el) => el.remove());
+                    grid.classList.remove('is-expanded');
+                    expandText.textContent = btn.dataset.expandLabel;
+                    icon.className = 'bi bi-arrows-angle-expand';
+                } else {
+                    const items = JSON.parse(grid.dataset.media || '[]');
+                    const postId = grid.closest('.feed-post').dataset.postId;
+                    for (let i = visibleCount; i < items.length; i++) {
+                        const item = items[i];
+                        const tile = document.createElement('button');
+                        tile.type = 'button';
+                        tile.className = 'feed-media-item' + (item.video ? ' feed-media-video' : '');
+                        tile.dataset.postId = postId;
+                        tile.dataset.mediaId = item.id;
+                        tile.dataset.index = i;
+                        tile.innerHTML = item.video
+                            ? '<span class="feed-media-play"><i class="bi bi-play-circle-fill"></i></span>'
+                            : `<img src="/Feed/Media/${item.id}" loading="lazy" alt="${@TJs("Opslagsbillede")}" />`;
+                        grid.appendChild(tile);
+                    }
+                    grid.classList.add('is-expanded');
+                    expandText.textContent = btn.dataset.collapseLabel;
+                    icon.className = 'bi bi-arrows-angle-contract';
+                }
+            };
 
             // ─── Confirm-delete modal (shared for posts & comments) ────────────
             const confirmModalEl = document.getElementById('feedConfirmDeleteModal');
@@ -749,6 +829,9 @@
             feedList.addEventListener('click', (e) => {
                 const mediaBtn = e.target.closest('.feed-media-item');
                 if (mediaBtn) { openLightbox(mediaBtn); return; }
+
+                const expandBtn = e.target.closest('.feed-media-expand-btn');
+                if (expandBtn) { toggleMediaExpand(expandBtn); return; }
 
                 const likeBtn = e.target.closest('.feed-like-btn');
                 if (likeBtn) { toggleLike(likeBtn); return; }

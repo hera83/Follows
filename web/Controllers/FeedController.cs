@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Server.Kestrel.Core.Features;
 using web.Constants;
 using web.Data.Entities;
 using web.Infrastructure;
@@ -345,6 +346,15 @@ namespace web.Controllers
         {
             var file = await _feedService.GetMediaFileAsync(id, HttpContext.RequestAborted);
             if (file is null) return NotFound();
+
+            // Kestrel kills a response by default if its transfer rate drops below ~240 bytes/sec
+            // for 5+ seconds. A video that's paused mid-buffer, or a viewer seeking around, can
+            // easily dip under that on a big file — the connection gets aborted and the <video>
+            // element sees it as a hard network error mid-playback. Large media responses need
+            // this disabled; see https://learn.microsoft.com/aspnet/core/mvc/models/file-uploads#kestrel-maximum-request-body-size
+            var minResponseDataRateFeature = HttpContext.Features.Get<IHttpMinResponseDataRateFeature>();
+            if (minResponseDataRateFeature is not null)
+                minResponseDataRateFeature.MinDataRate = null;
 
             return PhysicalFile(file.FullPath, file.ContentType, enableRangeProcessing: true);
         }

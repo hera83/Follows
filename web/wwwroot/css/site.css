@@ -1670,6 +1670,35 @@ p.feed-translated { padding: .5rem .75rem; }
   font-weight: 700;
 }
 
+/* ── Expanded media grid (all photos/videos) ── */
+.feed-media-grid.is-expanded {
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: none;
+  grid-auto-rows: 1fr;
+}
+.feed-media-grid.is-expanded .feed-media-item {
+  aspect-ratio: 1 / 1;
+  grid-row: auto !important;
+}
+.feed-media-grid.is-expanded .feed-media-more { display: none; }
+
+.feed-media-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  margin-top: .5rem;
+  padding: .2rem .1rem;
+  border: none;
+  background: none;
+  color: var(--clr-text-muted);
+  font-size: .78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color .15s;
+}
+.feed-media-expand-btn:hover { color: var(--clr-text); }
+.feed-media-expand-btn i { font-size: .9rem; }
+
 /* ── Actions row (like / comment count) ── */
 .feed-post-actions {
   display: flex;
@@ -1859,13 +1888,62 @@ p.feed-translated { padding: .5rem .75rem; }
 }
 .feed-lightbox.is-open { display: flex; }
 
-.feed-lightbox-content { max-width: 92vw; max-height: 88vh; display: flex; }
-.feed-lightbox-media {
+.feed-lightbox-content {
+  max-width: 92vw;
+  max-height: 88vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.feed-lightbox-image {
   max-width: 92vw;
   max-height: 88vh;
   object-fit: contain;
-  border-radius: var(--radius-md);
   display: block;
+  border-radius: var(--radius-md);
+}
+
+/*
+ * Video gets its own fixed, non-resizing frame instead of sizing to the file's intrinsic
+ * dimensions. Two reasons:
+ *  1. The box would otherwise jump in size the moment metadata finishes loading, which reads
+ *     as a stutter.
+ *  2. Clipping (border-radius/overflow:hidden) an ancestor of a <video> defeats hardware
+ *     video-overlay compositing on some Windows/Chromium setups, causing choppy playback and
+ *     a white flash — so this frame is deliberately left unclipped/square, unlike the image one.
+ */
+.feed-lightbox-video-frame {
+  position: relative;
+  width: min(92vw, 960px);
+  aspect-ratio: 16 / 9;
+  max-height: 88vh;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.feed-lightbox-video-frame video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.feed-lightbox-video-buffering {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: rgba(0,0,0,.35);
+  pointer-events: none;
+}
+.feed-lightbox-video-buffering .spinner-border { width: 2.5rem; height: 2.5rem; }
+.feed-lightbox-video-error {
+  color: #fff;
+  font-size: .9rem;
+  text-align: center;
+  padding: 0 1.5rem;
 }
 
 .feed-lightbox-close,
