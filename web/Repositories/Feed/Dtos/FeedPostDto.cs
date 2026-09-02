@@ -32,6 +32,10 @@ namespace web.Repositories.Feed.Dtos
         public int Id { get; set; }
         public bool IsVideo { get; set; }
         public string ContentType { get; set; } = string.Empty;
+
+        /// <summary>True while a video is still waiting for/undergoing its background HEVC → H.264
+        /// re-encode — the client shows a "being optimized" state instead of trying to play it.</summary>
+        public bool IsProcessing { get; set; }
     }
 
     public class FeedCommentDto

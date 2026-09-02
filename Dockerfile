@@ -19,9 +19,13 @@ RUN dotnet publish web/web.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
-# curl is used by the compose healthcheck.
+# curl is used by the compose healthcheck. ffmpeg is used by VideoTranscodeWorker to re-encode
+# uploaded feed video to H.264 — phone video (iPhone especially) is very often HEVC, which
+# browsers can only decode via an unreliable hardware path; baking ffmpeg into the image means
+# that "just works" with no manual per-host setup (VideoTranscode:FfmpegPath defaults to
+# "ffmpeg", which this puts on PATH).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --no-install-recommends curl ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Run as a non-root user. App_dbs/App_files are created here (owned by the

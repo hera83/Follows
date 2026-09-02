@@ -26,6 +26,8 @@ using web.Services.Ollama;
 using web.Services.Ollama.Interfaces;
 using web.Services.Sms;
 using web.Services.Sms.Interfaces;
+using web.Services.VideoTranscoding;
+using web.Services.VideoTranscoding.Interfaces;
 
 try
 {
@@ -171,6 +173,8 @@ try
     builder.Services.AddScoped<IDocumentsService, DocumentsService>();
     builder.Services.AddSingleton<DocumentTranslationJobTracker>();
     builder.Services.AddScoped<IMailService, MailService>();
+    builder.Services.AddScoped<IVideoTranscodingService, VideoTranscodingService>();
+    builder.Services.AddHostedService<VideoTranscodeWorker>();
 
     if (!string.IsNullOrWhiteSpace(builder.Configuration["Sms:ApiKey"]) && !string.IsNullOrWhiteSpace(smsBaseUrl))
     {

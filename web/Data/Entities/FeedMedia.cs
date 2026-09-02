@@ -18,6 +18,14 @@ namespace web.Data.Entities
         /// <summary>web.Constants.FeedMediaType.Image or .Video</summary>
         public string MediaType { get; set; } = string.Empty;
 
+        /// <summary>
+        /// web.Constants.VideoTranscodeStatus — only meaningful when MediaType is Video; stays null
+        /// for images. Uploaded video often arrives HEVC-encoded (the default on iPhone), which
+        /// browsers can only decode via a hardware path that's unreliable across devices; a
+        /// background worker re-encodes it to H.264 so playback doesn't depend on that.
+        /// </summary>
+        public string? TranscodeStatus { get; set; }
+
         /// <summary>Display order within the post (0-based)</summary>
         public int SortOrder { get; set; }
 

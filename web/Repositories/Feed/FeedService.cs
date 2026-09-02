@@ -200,6 +200,7 @@ namespace web.Repositories.Feed
                     {
                         File = metadata,
                         MediaType = media.MediaType,
+                        TranscodeStatus = media.MediaType == FeedMediaType.Video ? VideoTranscodeStatus.Pending : null,
                         SortOrder = order++,
                         CreatedAtUtc = DateTime.UtcNow
                     });
@@ -456,6 +457,16 @@ namespace web.Repositories.Feed
         /// letting the page render instantly. The client then calls Feed/Post/{id} (which routes to
         /// <see cref="MapPostAsync"/>, the slow/live path) in the background for anything flagged.
         /// </summary>
+        /// <summary>
+        /// True while a video's background re-encode hasn't finished yet. Null counts as pending too,
+        /// so video rows created before this feature existed (no TranscodeStatus set) show the same
+        /// "being optimized" state until VideoTranscodeWorker backfills them, instead of the client
+        /// trying to play their original — often HEVC, browser-hostile — file straight away.
+        /// </summary>
+        private static bool IsVideoProcessing(FeedMedia m) =>
+            m.MediaType == FeedMediaType.Video &&
+            m.TranscodeStatus is null or VideoTranscodeStatus.Pending or VideoTranscodeStatus.Processing;
+
         private static FeedPostDto MapPostFast(FeedPost post, Dictionary<string, AuthorInfo> authors, string currentUserId, string viewerLanguage)
         {
             authors.TryGetValue(post.AuthorId, out var author);
@@ -498,7 +509,8 @@ namespace web.Repositories.Feed
                     {
                         Id = m.Id,
                         IsVideo = m.MediaType == FeedMediaType.Video,
-                        ContentType = m.File?.ContentType ?? string.Empty
+                        ContentType = m.File?.ContentType ?? string.Empty,
+                        IsProcessing = IsVideoProcessing(m)
                     })
                     .ToList(),
                 LikeCount = post.Likes.Count,
@@ -582,7 +594,8 @@ namespace web.Repositories.Feed
                     {
                         Id = m.Id,
                         IsVideo = m.MediaType == FeedMediaType.Video,
-                        ContentType = m.File?.ContentType ?? string.Empty
+                        ContentType = m.File?.ContentType ?? string.Empty,
+                        IsProcessing = IsVideoProcessing(m)
                     })
                     .ToList(),
                 LikeCount = post.Likes.Count,

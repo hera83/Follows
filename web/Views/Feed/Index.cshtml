@@ -433,6 +433,18 @@
                 });
             };
 
+            // ─── Poll for videos still being optimized (background HEVC → H.264 re-encode) ──
+            // Unlike translation, this can take real time (a background worker, not a single request),
+            // so — unlike scanForPendingTranslations above — this actually needs to keep checking back
+            // rather than firing once. A re-fetched post that's done comes back without
+            // data-has-processing-media, so it naturally drops out of the next tick's selection.
+            const pollProcessingVideos = async () => {
+                const posts = Array.from(feedList.querySelectorAll('.feed-post[data-has-processing-media="true"]'));
+                if (!posts.length) return;
+                await Promise.all(posts.map((article) => refreshPost(article.dataset.postId)));
+            };
+            setInterval(pollProcessingVideos, 8000);
+
             // ─── Like toggle ─────────────────────────────────────────────────────
             const toggleLike = async (btn) => {
                 if (btn.disabled) return;
@@ -591,7 +603,11 @@
                 if (!item) return;
                 stopLightboxVideo();
 
-                if (item.video) {
+                if (item.processing) {
+                    lightboxContent.innerHTML = `<div class="feed-lightbox-video-frame">
+                        <span class="feed-lightbox-video-error">${@TJs("Videoen optimeres stadig og er klar om lidt.")}</span>
+                    </div>`;
+                } else if (item.video) {
                     // Fixed frame (see .feed-lightbox-video-frame in site.css) so the box never
                     // resizes once metadata arrives. No autoplay — the viewer presses play
                     // themselves; the spinner just reflects the video's own buffering state
@@ -662,14 +678,12 @@
                 const grid = btn.closest('.feed-post')?.querySelector('.feed-media-grid');
                 if (!grid) return;
                 const expandText = btn.querySelector('.feed-media-expand-text');
-                const icon = btn.querySelector('i');
                 const visibleCount = parseInt(grid.dataset.count, 10) || 4;
 
                 if (grid.classList.contains('is-expanded')) {
                     Array.from(grid.querySelectorAll('.feed-media-item')).slice(visibleCount).forEach((el) => el.remove());
                     grid.classList.remove('is-expanded');
                     expandText.textContent = btn.dataset.expandLabel;
-                    icon.className = 'bi bi-arrows-angle-expand';
                 } else {
                     const items = JSON.parse(grid.dataset.media || '[]');
                     const postId = grid.closest('.feed-post').dataset.postId;
@@ -677,18 +691,22 @@
                         const item = items[i];
                         const tile = document.createElement('button');
                         tile.type = 'button';
-                        tile.className = 'feed-media-item' + (item.video ? ' feed-media-video' : '');
+                        tile.className = 'feed-media-item'
+                            + (item.video ? ' feed-media-video' : '')
+                            + (item.processing ? ' feed-media-processing' : '');
                         tile.dataset.postId = postId;
                         tile.dataset.mediaId = item.id;
                         tile.dataset.index = i;
-                        tile.innerHTML = item.video
-                            ? '<span class="feed-media-play"><i class="bi bi-play-circle-fill"></i></span>'
-                            : `<img src="/Feed/Media/${item.id}" loading="lazy" alt="${@TJs("Opslagsbillede")}" />`;
+                        tile.dataset.processing = item.processing ? 'true' : 'false';
+                        tile.innerHTML = item.processing
+                            ? `<span class="feed-media-processing-badge"><span class="spinner-border spinner-border-sm"></span> ${@TJs("Optimerer video...")}</span>`
+                            : item.video
+                                ? '<span class="feed-media-play"><i class="bi bi-play-circle-fill"></i></span>'
+                                : `<img src="/Feed/Media/${item.id}" loading="lazy" alt="${@TJs("Opslagsbillede")}" />`;
                         grid.appendChild(tile);
                     }
                     grid.classList.add('is-expanded');
                     expandText.textContent = btn.dataset.collapseLabel;
-                    icon.className = 'bi bi-arrows-angle-contract';
                 }
             };
 
@@ -828,7 +846,14 @@
             // ─── Delegated events on the feed list (survives dynamic updates) ──
             feedList.addEventListener('click', (e) => {
                 const mediaBtn = e.target.closest('.feed-media-item');
-                if (mediaBtn) { openLightbox(mediaBtn); return; }
+                if (mediaBtn) {
+                    if (mediaBtn.dataset.processing === 'true') {
+                        window.FvToast.show('info', @TJs("Videoen optimeres stadig og er klar om lidt."));
+                        return;
+                    }
+                    openLightbox(mediaBtn);
+                    return;
+                }
 
                 const expandBtn = e.target.closest('.feed-media-expand-btn');
                 if (expandBtn) { toggleMediaExpand(expandBtn); return; }

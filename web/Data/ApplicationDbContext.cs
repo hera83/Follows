@@ -226,6 +226,9 @@ namespace web.Data
                     .IsRequired()
                     .HasMaxLength(20);
 
+                entity.Property(e => e.TranscodeStatus)
+                    .HasMaxLength(20);
+
                 entity.Property(e => e.CreatedAtUtc)
                     .IsRequired();
 

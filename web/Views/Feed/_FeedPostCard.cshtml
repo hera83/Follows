@@ -1,6 +1,10 @@
 @model web.ViewModels.FeedPostViewModel
 
-<article class="feed-post card" data-post-id="@Model.Id" data-needs-translation="@Model.NeedsTranslation.ToString().ToLowerInvariant()">
+@{
+    var hasProcessingMedia = Model.Media.Any(m => m.IsProcessing);
+}
+<article class="feed-post card" data-post-id="@Model.Id" data-needs-translation="@Model.NeedsTranslation.ToString().ToLowerInvariant()"
+          data-has-processing-media="@hasProcessingMedia.ToString().ToLowerInvariant()">
     <div class="feed-post-header">
         <div class="feed-avatar">
             @if (Model.AuthorHasAvatar)
@@ -55,15 +59,19 @@
     {
         var visibleCount = Math.Min(Model.Media.Count, 4);
         var extraCount = Model.Media.Count - visibleCount;
-        var allMediaJson = System.Text.Json.JsonSerializer.Serialize(Model.Media.Select(m => new { id = m.Id, video = m.IsVideo }));
+        var allMediaJson = System.Text.Json.JsonSerializer.Serialize(Model.Media.Select(m => new { id = m.Id, video = m.IsVideo, processing = m.IsProcessing }));
         <div class="feed-media-grid" data-count="@visibleCount" data-media='@Html.Raw(allMediaJson)'>
             @for (var i = 0; i < visibleCount; i++)
             {
                 var media = Model.Media[i];
                 var isOverlayTile = extraCount > 0 && i == visibleCount - 1;
-                <button type="button" class="feed-media-item @(media.IsVideo ? "feed-media-video" : "")"
-                        data-post-id="@Model.Id" data-media-id="@media.Id" data-index="@i">
-                    @if (media.IsVideo)
+                <button type="button" class="feed-media-item @(media.IsVideo ? "feed-media-video" : "") @(media.IsProcessing ? "feed-media-processing" : "")"
+                        data-post-id="@Model.Id" data-media-id="@media.Id" data-index="@i" data-processing="@media.IsProcessing.ToString().ToLowerInvariant()">
+                    @if (media.IsProcessing)
+                    {
+                        <span class="feed-media-processing-badge"><span class="spinner-border spinner-border-sm"></span> @T("Optimerer video...")</span>
+                    }
+                    else if (media.IsVideo)
                     {
                         <span class="feed-media-play"><i class="bi bi-play-circle-fill"></i></span>
                     }
@@ -82,7 +90,6 @@
         {
             <button type="button" class="feed-media-expand-btn"
                     data-expand-label="@T("Vis alle billeder")" data-collapse-label="@T("Vis færre")">
-                <i class="bi bi-arrows-angle-expand"></i>
                 <span class="feed-media-expand-text">@T("Vis alle billeder")</span>
             </button>
         }

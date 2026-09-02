@@ -374,7 +374,7 @@ namespace web.Controllers
             TranslatedLabel = labels.Translated,
             TranslatingLabel = labels.Translating,
             CreatedAtUtc = dto.CreatedAtUtc,
-            Media = dto.Media.Select(m => new FeedMediaViewModel { Id = m.Id, IsVideo = m.IsVideo, ContentType = m.ContentType }).ToList(),
+            Media = dto.Media.Select(m => new FeedMediaViewModel { Id = m.Id, IsVideo = m.IsVideo, ContentType = m.ContentType, IsProcessing = m.IsProcessing }).ToList(),
             LikeCount = dto.LikeCount,
             IsLikedByCurrentUser = dto.IsLikedByCurrentUser,
             CanDelete = dto.AuthorId == currentUserId || isModerator,

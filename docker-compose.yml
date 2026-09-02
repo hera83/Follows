@@ -59,6 +59,12 @@ services:
       Sms__BaseUrl: ${SMS_BASE_URL:-}
       Sms__ApiKey: ${SMS_API_KEY:-}
       Sms__WorkerIntervalSeconds: ${SMS_WORKER_INTERVAL_SECONDS:-30}
+
+      # Video transcoding (feed video → H.264, so HEVC phone uploads play reliably in-browser).
+      # ffmpeg is baked into the image (see Dockerfile) so FfmpegPath just needs to find it on PATH.
+      VideoTranscode__FfmpegPath: ${VIDEO_TRANSCODE_FFMPEG_PATH:-ffmpeg}
+      VideoTranscode__WorkerIntervalSeconds: ${VIDEO_TRANSCODE_WORKER_INTERVAL_SECONDS:-15}
+      VideoTranscode__TimeoutMinutes: ${VIDEO_TRANSCODE_TIMEOUT_MINUTES:-20}
     volumes:
       # Named volumes: Docker seeds them from /app/App_dbs and /app/App_files
       # in the image on first start, which preserves the non-root "app" user

@@ -1658,6 +1658,19 @@ p.feed-translated { padding: .5rem .75rem; }
 [data-theme="light"] .feed-media-video { background: linear-gradient(145deg, #3a4250, #232936); }
 .feed-media-play { color: #fff; font-size: 2.5rem; opacity: .92; filter: drop-shadow(0 2px 6px rgba(0,0,0,.4)); }
 
+.feed-media-processing { cursor: default; }
+.feed-media-processing-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .5rem;
+  color: #fff;
+  font-size: .75rem;
+  font-weight: 600;
+  text-align: center;
+  padding: 0 .5rem;
+}
+
 .feed-media-more {
   position: absolute;
   inset: 0;
@@ -1697,7 +1710,6 @@ p.feed-translated { padding: .5rem .75rem; }
   transition: color .15s;
 }
 .feed-media-expand-btn:hover { color: var(--clr-text); }
-.feed-media-expand-btn i { font-size: .9rem; }
 
 /* ── Actions row (like / comment count) ── */
 .feed-post-actions {
