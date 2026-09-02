@@ -35,8 +35,17 @@
 
                 <input type="file" id="feedComposerFileInput" name="Files" class="d-none" multiple
                        accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" />
+                <!-- Separat input med capture="environment": på mobil åbner dette kameraet direkte i
+                     stedet for galleri-vælgeren, så et opslag kan laves i ét flow (tag billede →
+                     skriv opskrift/tekst → del). Uden multiple, da kameraoptag er ét billede ad gangen;
+                     "Billede/video"-knappen ovenfor dækker fortsat galleri-valg af flere filer/video. -->
+                <input type="file" id="feedComposerCameraInput" class="d-none"
+                       accept="image/jpeg,image/png,image/webp" capture="environment" />
 
                 <div class="feed-composer-toolbar">
+                    <button type="button" class="btn btn-secondary" id="feedComposerCameraBtn">
+                        <i class="bi bi-camera me-1"></i> @T("Tag billede")
+                    </button>
                     <button type="button" class="btn btn-secondary" id="feedComposerAttachBtn">
                         <i class="bi bi-images me-1"></i> @T("Billede/video")
                     </button>
@@ -187,6 +196,7 @@
             const captionEl = document.getElementById('feedComposerCaption');
             const submitBtn = document.getElementById('feedComposerSubmitBtn');
             const fileInput = document.getElementById('feedComposerFileInput');
+            const cameraInput = document.getElementById('feedComposerCameraInput');
             const previewEl = document.getElementById('feedComposerPreview');
             let selectedFiles = [];
 
@@ -236,11 +246,13 @@
             };
 
             document.getElementById('feedComposerAttachBtn').addEventListener('click', () => fileInput.click());
+            document.getElementById('feedComposerCameraBtn').addEventListener('click', () => cameraInput.click());
 
             captionEl.addEventListener('input', () => { autoSize(captionEl); updateSubmitState(); });
 
-            fileInput.addEventListener('change', () => {
-                const incoming = Array.from(fileInput.files || []);
+            // Delt af galleri-input og kamera-input, så et billede taget med kameraet går gennem
+            // samme grænser (maxFiles/maxBytes) og forhåndsvisning som et valgt fra galleriet.
+            const addFiles = (incoming) => {
                 for (const file of incoming) {
                     if (selectedFiles.length >= maxFiles) {
                         window.FvToast.show('warning', `${@TJs("Du kan højst vedhæfte")} ${maxFiles} ${@TJs("filer.")}`);
@@ -257,6 +269,18 @@
                 syncFileInput();
                 renderPreviews();
                 updateSubmitState();
+            };
+
+            fileInput.addEventListener('change', () => {
+                addFiles(Array.from(fileInput.files || []));
+                fileInput.value = '';
+            });
+
+            cameraInput.addEventListener('change', () => {
+                addFiles(Array.from(cameraInput.files || []));
+                // Nulstil, så det samme kamera-tag kan bruges igen (browseren udløser ellers ikke
+                // et nyt change-event, hvis "filen" ellers ville se identisk ud).
+                cameraInput.value = '';
             });
 
             // ─── Shared, deduped fetch of one post's card HTML ──────────────────

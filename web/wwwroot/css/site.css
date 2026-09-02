@@ -1514,10 +1514,19 @@ input[type="file"]::-webkit-file-upload-button:hover {
 .feed-composer-toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: .5rem;
   margin-top: .9rem;
   padding-top: .9rem;
   border-top: 1px solid var(--clr-border);
+}
+
+/* "Tag billede" bruger input[capture], som kun rigtige mobil-OS'er respekterer — på en
+   mus/tastatur-enhed (hover: hover, pointer: fine) åbner den samme filvælger som "Billede/video",
+   så den skjules der for ikke at fremstå som to identiske knapper. Vises på touch-enheder
+   (telefon/tablet), hvor den reelt sender brugeren direkte til kameraet. */
+@media (hover: hover) and (pointer: fine) {
+  #feedComposerCameraBtn { display: none; }
 }
 
 /* ── Empty state ── */
