@@ -51,19 +51,19 @@
                          fylder for meget på en smal telefonskærm; kun synlig på touch-enheder
                          (se .feed-composer-camera-group i site.css). -->
                     <div class="btn-group feed-composer-camera-group" id="feedComposerCameraGroup">
-                        <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-camera me-1"></i> @T("Kamera")
+                        <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="@T("Kamera")">
+                            <i class="bi bi-camera me-1"></i><span class="feed-composer-btn-label">@T("Kamera")</span>
                         </button>
                         <ul class="dropdown-menu">
                             <li><button type="button" class="dropdown-item" id="feedComposerCameraPhotoBtn"><i class="bi bi-camera me-2"></i>@T("Tag billede")</button></li>
                             <li><button type="button" class="dropdown-item" id="feedComposerCameraVideoBtn"><i class="bi bi-camera-video me-2"></i>@T("Optag video")</button></li>
                         </ul>
                     </div>
-                    <button type="button" class="btn btn-secondary" id="feedComposerAttachBtn">
-                        <i class="bi bi-images me-1"></i> @T("Billede/video")
+                    <button type="button" class="btn btn-secondary" id="feedComposerAttachBtn" aria-label="@T("Billede/video")">
+                        <i class="bi bi-images me-1"></i><span class="feed-composer-btn-label"> @T("Billede/video")</span>
                     </button>
-                    <button type="submit" class="btn btn-primary ms-auto" id="feedComposerSubmitBtn" disabled>
-                        <i class="bi bi-send me-1"></i> @T("Del historie")
+                    <button type="submit" class="btn btn-primary ms-auto" id="feedComposerSubmitBtn" disabled aria-label="@T("Del historie")">
+                        <i class="bi bi-send me-1"></i><span class="feed-composer-btn-label"> @T("Del historie")</span>
                     </button>
                 </div>
             </form>
@@ -343,7 +343,7 @@
 
                 submitBtn.disabled = true;
                 const originalHtml = submitBtn.innerHTML;
-                submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> ${@TJs("Deler...")}`;
+                submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span><span class="feed-composer-btn-label"> ${@TJs("Deler...")}</span>`;
 
                 const data = await window.FvForm.submit(form);
 

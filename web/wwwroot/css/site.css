@@ -1530,6 +1530,23 @@ input[type="file"]::-webkit-file-upload-button:hover {
   .feed-composer-camera-group { display: none; }
 }
 
+/* Meget smal skærm: "Kamera", "Billede/video" og "Del historie" bliver ikon-only, så toolbaren
+   ikke knækker om på flere linjer på de smalleste telefoner. aria-label på knapperne holder dem
+   tilgængelige for skærmlæsere. */
+@media (max-width: 420px) {
+  .feed-composer-btn-label { display: none; }
+  #feedComposerCameraGroup .dropdown-toggle,
+  #feedComposerAttachBtn,
+  #feedComposerSubmitBtn {
+    padding-left: .6rem;
+    padding-right: .6rem;
+  }
+  #feedComposerCameraGroup .dropdown-toggle i,
+  #feedComposerAttachBtn i,
+  #feedComposerSubmitBtn i,
+  #feedComposerSubmitBtn .spinner-border { margin-right: 0 !important; }
+}
+
 /* ── Empty state ── */
 .feed-empty {
   text-align: center;
