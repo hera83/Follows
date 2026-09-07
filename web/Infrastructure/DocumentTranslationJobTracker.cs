@@ -30,8 +30,9 @@ namespace web.Infrastructure
         public string TargetLanguageName { get; set; } = string.Empty;
         public string? Html { get; set; }
         public bool Truncated { get; set; }
+        public bool UsedOcr { get; set; }
 
-        /// <summary>Info/warning toast text for AlreadyInTargetLanguage or Truncated, already translated to the viewer's profile language — see TranslateDocumentResponseDto.Message for why this is built server-side.</summary>
+        /// <summary>Info/warning toast text for AlreadyInTargetLanguage, Truncated or UsedOcr, already translated to the viewer's profile language — see TranslateDocumentResponseDto.Message for why this is built server-side.</summary>
         public string? Message { get; set; }
 
         public DateTime CreatedAtUtc { get; init; } = DateTime.UtcNow;

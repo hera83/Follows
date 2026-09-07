@@ -29,5 +29,19 @@ public class AiGatewaySettings
     /// </summary>
     public string? TranslationModel { get; set; }
 
+    /// <summary>
+    /// Vision-capable chat model used for the Documents OCR fallback (see
+    /// DocumentsService.TranslateDocumentAsync / LanguageTools.RecognizeImageTextAsync) — triggered when a
+    /// PDF's page has no extractable text at all (page.Letters is empty; see
+    /// DocumentMarkdownExtractor.ExtractPdf's comment on "born vector" PDFs — text drawn as outline paths
+    /// instead of real text runs, e.g. from certain "print to PDF" pipelines — where the underlying
+    /// characters genuinely don't exist in the file, so no text-extraction library can recover them, only
+    /// reading the rendered pixels can). Left empty, the OCR fallback is skipped entirely and such PDFs
+    /// keep failing with the ordinary "no text found" error — DefaultChatModel/TranslationModel are
+    /// ordinary text models and can't be assumed to understand image input, so this needs its own explicit
+    /// setting rather than falling back to either of them.
+    /// </summary>
+    public string? VisionModel { get; set; }
+
     public int RequestTimeoutSeconds { get; set; } = 300;
 }

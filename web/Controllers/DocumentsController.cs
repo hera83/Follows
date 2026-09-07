@@ -325,6 +325,7 @@ namespace web.Controllers
                             job.TargetLanguageName = result.TargetLanguageName;
                             job.Html = result.Html;
                             job.Truncated = result.Truncated;
+                            job.UsedOcr = result.UsedOcr;
                             job.Message = result.Message;
                         });
                     }
@@ -379,6 +380,7 @@ namespace web.Controllers
                 targetLanguageName = job.TargetLanguageName,
                 html = job.Html,
                 truncated = job.Truncated,
+                usedOcr = job.UsedOcr,
                 // Already translated to the viewer's profile language (see TranslateDocumentResponseDto.
                 // Message and the Fail(...) calls in TranslateStart above) — the client shows this as-is
                 // instead of building its own Danish toast text, which is what let this response's shape

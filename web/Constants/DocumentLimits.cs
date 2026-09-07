@@ -103,6 +103,12 @@ namespace web.Constants
         /// occasional retry (see TranslationChunkMaxAttempts), not just per-page translation time. Keep
         /// this comfortably above the client's TRANSLATE_POLL_TIMEOUT_MS in Group.cshtml, so a slow-but-
         /// working job isn't cut off client-side before it gets the chance to actually finish server-side.
+        ///
+        /// When the OCR fallback runs (see OcrMaxPages/OcrPageMaxAttempts), its vision-model calls happen
+        /// first and add on top of the ordinary chunk-translation time budgeted above — a document that
+        /// needs both a near-worst-case OCR pass and a near-worst-case translation pass could get close to
+        /// this ceiling. Retune this alongside OcrMaxPages/OcrPageMaxAttempts if that turns out to matter
+        /// in practice, rather than in isolation.
         /// </summary>
         public const int TranslationJobTimeoutMinutes = 25;
 
@@ -115,6 +121,31 @@ namespace web.Constants
         /// a real answer rather than papering over a hard, deterministic failure.
         /// </summary>
         public const int TranslationChunkMaxAttempts = 3;
+
+        /// <summary>
+        /// Upper bound on how many pages of a PDF are rasterized and sent through the OCR fallback (see
+        /// DocumentMarkdownExtractor.RenderPdfPagesToPng / DocumentsService.TranslateDocumentAsync) when the
+        /// PDF has no extractable text at all. Each page is its own AI Gateway vision-model round trip
+        /// (much slower than a translation chunk — a single call took 38-85 seconds against gemma4:12b in
+        /// live testing, versus a handful of seconds for a text chunk), so this is a tighter cap than the
+        /// plain-text pipeline's page-equivalent budget (MaxTranslatableChars). Kept deliberately low
+        /// relative to OcrPageMaxAttempts below and TranslationJobTimeoutMinutes: worst case (every page
+        /// needs its full retry budget) is OcrMaxPages × OcrPageMaxAttempts sequential vision calls, which
+        /// must fit comfortably inside the job timeout - retune all three together, not just one.
+        /// </summary>
+        public const int OcrMaxPages = 5;
+
+        /// <summary>
+        /// How many times a single page is retried by the OCR fallback when the vision model comes back
+        /// with an empty result — the exact same "thinking model" flakiness TranslationChunkMaxAttempts
+        /// guards against (see its comment), confirmed live for OCR too: a page that came back empty
+        /// (model spent its whole token budget on hidden reasoning, never produced an answer) succeeded
+        /// cleanly on an immediate retry of the identical request. Kept as a separate constant from
+        /// TranslationChunkMaxAttempts since an OCR attempt is far more expensive (a full vision-model
+        /// pass per page, easily a minute or more) than a text-chunk translation, so the two may need
+        /// independent tuning.
+        /// </summary>
+        public const int OcrPageMaxAttempts = 3;
 
         /// <summary>Bootstrap Icons class for a document row, chosen from its content type.</summary>
         public static string IconClassFor(string contentType) => contentType switch

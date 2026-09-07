@@ -338,6 +338,64 @@ namespace web.Infrastructure
             return CompleteAsync(systemPrompt, text, model, cancellationToken);
         }
 
+        /// <summary>
+        /// Læser (OCR'er) al synlig tekst i <paramref name="pngImage"/> via en vision-kapabel chat-model —
+        /// bruges som fallback for PDF-sider uden noget udtrækkeligt tekstlag overhovedet (se
+        /// DocumentMarkdownExtractor.RenderPdfPagesToPng's kommentar om "født som vektor"-PDF'er: tekst
+        /// tegnet som vektor-omrids i stedet for rigtige tekst-objekter, set i praksis fra "Microsoft: Print
+        /// To PDF" på visse browser-/mailklient-udskrifter — her findes tegnene reelt ikke i filen, kun
+        /// deres visuelle form, så ingen tekst-udtræknings-bibliotek kan finde dem; kun at læse de
+        /// renderede pixels kan). Modsat alle andre metoder her falder denne ALDRIG tilbage til
+        /// DefaultChatModel/TranslationModel, hvis intet <paramref name="model"/> er angivet og
+        /// AiGateway:VisionModel ikke er sat - almindelige tekst-modeller kan ikke antages at forstå
+        /// billed-input, og at sende dem alligevel ville bare spilde et kald på et sandsynligvis dårligt
+        /// svar. Returnerer tom streng både når modellen ikke finder nogen læsbar tekst, og når ingen
+        /// vision-model er konfigureret - kald AiGatewaySettings.VisionModel direkte hvis den forskel skal
+        /// kunne skelnes.
+        /// </summary>
+        public async Task<string> RecognizeImageTextAsync(
+            byte[] pngImage,
+            string? model = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (pngImage.Length == 0) return string.Empty;
+
+            var resolvedModel = model;
+            if (string.IsNullOrWhiteSpace(resolvedModel))
+            {
+                var config = await _configurationProvider.GetActiveConfigurationAsync(cancellationToken);
+                resolvedModel = config.VisionModel;
+            }
+            if (string.IsNullOrWhiteSpace(resolvedModel))
+                return string.Empty;
+
+            const string systemPrompt =
+                "Du udfører OCR (tekstgenkendelse) på billeder af dokumentsider. Læs al synlig tekst i " +
+                "billedet ordret, og bevar linjeskift, punktopstillinger og evt. tabelstruktur så vidt " +
+                "muligt. Svar udelukkende med den genkendte tekst - ingen indledning, ingen forklaringer. " +
+                "Hvis billedet ikke indeholder nogen læsbar tekst, svar med præcis \"INGEN_TEKST\" og intet andet.";
+
+            var response = await _aiGateway.OllamaChatAsync(new ChatRequestDto
+            {
+                Model = resolvedModel,
+                Messages = new List<OllamaMessageDto>
+                {
+                    new() { Role = "system", Content = systemPrompt },
+                    new()
+                    {
+                        Role = "user",
+                        Content = "Læs teksten i dette billede.",
+                        Images = new List<string> { Convert.ToBase64String(pngImage) }
+                    }
+                },
+                Options = new OllamaOptionsDto { Temperature = 0.1, NumCtx = 8192, NumPredict = 3000 },
+                KeepAlive = "30m"
+            }, cancellationToken);
+
+            var text = CleanResponse(response.Message?.Content);
+            return string.Equals(text, "INGEN_TEKST", StringComparison.OrdinalIgnoreCase) ? string.Empty : text;
+        }
+
         // Nogle modeller (set bl.a. med gemma4:12b) lækker rå styre-tokens fra deres chat-template
         // ind i svaret, fx "<channel|>" eller "<|message|>" foran selve teksten, eller hele
         // ræsonnement-blokke i "<think>...</think>" (kendt fra reasoning-modeller som DeepSeek-R1/QwQ).

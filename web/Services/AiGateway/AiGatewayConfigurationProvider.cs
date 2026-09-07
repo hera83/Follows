@@ -23,6 +23,7 @@ public class AiGatewayConfigurationProvider : IAiGatewayConfigurationProvider
             DefaultTtsVoice = _configuration["AiGateway:DefaultTtsVoice"],
             DefaultSttModel = _configuration["AiGateway:DefaultSttModel"],
             TranslationModel = _configuration["AiGateway:TranslationModel"],
+            VisionModel = _configuration["AiGateway:VisionModel"],
             RequestTimeoutSeconds = int.TryParse(_configuration["AiGateway:RequestTimeoutSeconds"], out var timeout) && timeout > 0 ? timeout : 300,
         };
 

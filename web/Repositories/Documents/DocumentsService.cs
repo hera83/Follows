@@ -351,6 +351,31 @@ namespace web.Repositories.Documents
                 return new TranslateDocumentResponseDto { Success = false, ErrorMessage = "Kunne ikke læse indholdet af dokumentet." };
             }
 
+            // Overrides DefaultChatModel with AiGateway:TranslationModel when one is configured — see
+            // AiGatewaySettings.TranslationModel for why: DefaultChatModel is sometimes a reasoning
+            // model, and reasoning models turned out (confirmed by live testing) to be unreliable here,
+            // silently spending their whole token budget on hidden reasoning instead of ever answering.
+            var aiConfig = await _aiGatewayConfigurationProvider.GetActiveConfigurationAsync(ct);
+            var translationModel = string.IsNullOrWhiteSpace(aiConfig.TranslationModel) ? null : aiConfig.TranslationModel;
+
+            var usedOcr = false;
+            if (string.IsNullOrWhiteSpace(extracted) && contentType == "application/pdf" && !string.IsNullOrWhiteSpace(aiConfig.VisionModel))
+            {
+                // A "born vector" PDF — see DocumentMarkdownExtractor.RenderPdfPagesToPng's doc comment:
+                // the page has no text-showing operations at all (typically a Windows "Print to PDF" of
+                // something that flattened its text to outline paths), so there is nothing left to pull
+                // out as text - only reading the rendered page images via a vision model can recover it.
+                try
+                {
+                    extracted = await ExtractPdfTextViaOcrAsync(fullPath, aiConfig.VisionModel, documentId, ct);
+                    usedOcr = !string.IsNullOrWhiteSpace(extracted);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "OCR fallback failed for document {DocumentId}", documentId);
+                }
+            }
+
             if (string.IsNullOrWhiteSpace(extracted))
                 return new TranslateDocumentResponseDto { Success = false, ErrorMessage = "Der blev ikke fundet nogen tekst i dokumentet." };
 
@@ -360,13 +385,6 @@ namespace web.Repositories.Documents
                 extracted = extracted[..DocumentLimits.MaxTranslatableChars];
                 truncated = true;
             }
-
-            // Overrides DefaultChatModel with AiGateway:TranslationModel when one is configured — see
-            // AiGatewaySettings.TranslationModel for why: DefaultChatModel is sometimes a reasoning
-            // model, and reasoning models turned out (confirmed by live testing) to be unreliable here,
-            // silently spending their whole token budget on hidden reasoning instead of ever answering.
-            var aiConfig = await _aiGatewayConfigurationProvider.GetActiveConfigurationAsync(ct);
-            var translationModel = string.IsNullOrWhiteSpace(aiConfig.TranslationModel) ? null : aiConfig.TranslationModel;
 
             // Only a short sample, not the whole (possibly 45,000-char) document — confirmed by live testing
             // that this isn't just a cost optimization but fixes a real correctness bug: given the full text
@@ -486,19 +504,87 @@ namespace web.Repositories.Documents
                 _logger.LogDebug(ex, "Document translation cache write skipped for document {DocumentId}/{Language} (likely already cached by a concurrent request)", documentId, targetLanguageCode);
             }
 
-            _logger.LogInformation("Document {DocumentId} translated to {Language}", documentId, targetLanguageCode);
+            // Truncated and UsedOcr are independent (an OCR'd document can also come out long enough to
+            // truncate) so both notes are combined into one toast rather than one silently winning.
+            var notes = new List<string>();
+            if (usedOcr)
+                notes.Add("Dokumentet indeholdt intet tekstlag og blev læst med billedgenkendelse (OCR) — der kan forekomme enkelte genkendelsesfejl.");
+            if (truncated)
+                notes.Add("Dokumentet var langt og blev afkortet før oversættelse — enkelte afsnit mangler muligvis.");
+
+            _logger.LogInformation("Document {DocumentId} translated to {Language}{OcrNote}", documentId, targetLanguageCode, usedOcr ? " (via OCR fallback)" : "");
             return new TranslateDocumentResponseDto
             {
                 Success = true,
                 Html = MarkdownRenderer.ToSafeHtml(markdown),
                 TargetLanguageName = targetNative,
                 Truncated = truncated,
-                Message = truncated
-                    ? await _toastTranslator.TranslateAsync(
-                        "Dokumentet var langt og blev afkortet før oversættelse — enkelte afsnit mangler muligvis.",
-                        targetLanguageCode, ct)
+                UsedOcr = usedOcr,
+                Message = notes.Count > 0
+                    ? await _toastTranslator.TranslateAsync(string.Join(" ", notes), targetLanguageCode, ct)
                     : null
             };
+        }
+
+        /// <summary>
+        /// OCR fallback for a PDF whose pages have no extractable text at all (see
+        /// DocumentMarkdownExtractor.RenderPdfPagesToPng's doc comment). Rasterizes up to
+        /// DocumentLimits.OcrMaxPages pages and reads each one via <see cref="LanguageTools.RecognizeImageTextAsync"/>,
+        /// concatenating whatever comes back. A single bad page (rasterization or model failure) is
+        /// logged and skipped rather than failing the whole document — matches ExtractPdf's per-page
+        /// isolation for the same reason.
+        /// </summary>
+        private async Task<string> ExtractPdfTextViaOcrAsync(string fullPath, string visionModel, int documentId, CancellationToken ct)
+        {
+            List<byte[]> pageImages;
+            try
+            {
+                pageImages = DocumentMarkdownExtractor.RenderPdfPagesToPng(fullPath, DocumentLimits.OcrMaxPages);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "PDF rasterization failed for document {DocumentId}", documentId);
+                return string.Empty;
+            }
+
+            var sb = new System.Text.StringBuilder();
+            for (var i = 0; i < pageImages.Count; i++)
+            {
+                // Same "thinking model" flakiness TranslateDocumentAsync's chunk loop retries around (see
+                // its comment) - confirmed live for OCR too: gemma4:12b given this exact page image came
+                // back with an empty answer (doneReason "length", ~3700 tokens all spent on hidden
+                // reasoning) on one attempt and a correct, complete transcription on the very next, same
+                // request. A page is a much more expensive retry than a translation chunk (a minute or
+                // more per attempt), so it's worth the wait rather than treating one empty page as final.
+                var pageText = string.Empty;
+                for (var attempt = 1; attempt <= DocumentLimits.OcrPageMaxAttempts; attempt++)
+                {
+                    try
+                    {
+                        pageText = await _language.RecognizeImageTextAsync(pageImages[i], model: visionModel, cancellationToken: ct);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "OCR call failed for page {PageIndex} of document {DocumentId}, attempt {Attempt}/{MaxAttempts}",
+                            i + 1, documentId, attempt, DocumentLimits.OcrPageMaxAttempts);
+                        continue;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(pageText)) break;
+
+                    _logger.LogWarning(
+                        "OCR returned an empty result for page {PageIndex} of document {DocumentId}, attempt {Attempt}/{MaxAttempts}{GivingUp}",
+                        i + 1, documentId, attempt, DocumentLimits.OcrPageMaxAttempts,
+                        attempt == DocumentLimits.OcrPageMaxAttempts ? " - giving up on this page" : " - retrying");
+                }
+
+                if (!string.IsNullOrWhiteSpace(pageText))
+                {
+                    sb.AppendLine(pageText);
+                    sb.AppendLine();
+                }
+            }
+            return sb.ToString();
         }
 
         /// <summary>

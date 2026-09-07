@@ -18,12 +18,21 @@ namespace web.Repositories.Documents.Dtos
         public bool Truncated { get; set; }
 
         /// <summary>
-        /// Info/warning toast text for AlreadyInTargetLanguage or Truncated (mutually exclusive - the former
-        /// returns before translation ever runs, so a response is never both), already translated to the
-        /// viewer's profile language. Built here, not client-side, specifically so it goes through the same
-        /// translation as everything else - a client-built string (interpolating just TargetLanguageName
-        /// into a hard-coded Danish sentence) has no server response for ToastTranslationFilter to
-        /// intercept, so it would always show up in Danish regardless of the viewer's profile language.
+        /// True if the PDF had no extractable text layer at all (see
+        /// DocumentMarkdownExtractor.RenderPdfPagesToPng's doc comment) and its text came from the OCR
+        /// fallback (rasterize + vision model) instead of real text extraction — worth flagging since OCR
+        /// can misread the odd character, unlike the normal extraction path.
+        /// </summary>
+        public bool UsedOcr { get; set; }
+
+        /// <summary>
+        /// Info/warning toast text for AlreadyInTargetLanguage, or for Truncated/UsedOcr (independent of
+        /// each other - both can apply to the same response, unlike AlreadyInTargetLanguage which returns
+        /// before translation ever runs), already translated to the viewer's profile language. Built here,
+        /// not client-side, specifically so it goes through the same translation as everything else - a
+        /// client-built string (interpolating just TargetLanguageName into a hard-coded Danish sentence)
+        /// has no server response for ToastTranslationFilter to intercept, so it would always show up in
+        /// Danish regardless of the viewer's profile language.
         /// </summary>
         public string? Message { get; set; }
     }

@@ -1,5 +1,7 @@
 using System.Text;
 using DocumentFormat.OpenXml.Packaging;
+using PDFtoImage;
+using SkiaSharp;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 using A = DocumentFormat.OpenXml.Drawing;
@@ -69,6 +71,33 @@ namespace web.Infrastructure
                 sb.AppendLine();
             }
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Rasterizes each page of a PDF to a PNG image — the OCR fallback used by
+        /// DocumentsService.TranslateDocumentAsync when <see cref="ExtractPdf"/> finds no letters at all on
+        /// any page. That happens for "born vector" PDFs: ones where the text was flattened to outline
+        /// paths (ordinary line/curve/fill drawing operations) instead of being kept as real text-showing
+        /// operations — seen in practice from Windows' "Microsoft: Print To PDF" driver applied to some
+        /// browser/mail-client print pipelines. The characters themselves genuinely don't exist anywhere in
+        /// such a file, only their visual shapes do, so no text-extraction library (this one included) can
+        /// recover them — reading the rendered pixels via a vision model is the only way. Stops after
+        /// <paramref name="maxPages"/> pages as a cost/time cap, same spirit as DocumentLimits.MaxTranslatableChars.
+        /// </summary>
+        public static List<byte[]> RenderPdfPagesToPng(string fullPath, int maxPages)
+        {
+            var bytes = File.ReadAllBytes(fullPath);
+            var images = new List<byte[]>();
+            foreach (var bitmap in Conversion.ToImages(bytes))
+            {
+                using (bitmap)
+                {
+                    using var encoded = bitmap.Encode(SKEncodedImageFormat.Png, 90);
+                    images.Add(encoded.ToArray());
+                }
+                if (images.Count >= maxPages) break;
+            }
+            return images;
         }
 
         private static string ExtractDocx(Stream stream)
