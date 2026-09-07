@@ -1,6 +1,7 @@
 using System.Text;
 using DocumentFormat.OpenXml.Packaging;
 using UglyToad.PdfPig;
+using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 using A = DocumentFormat.OpenXml.Drawing;
 using P = DocumentFormat.OpenXml.Presentation;
 using S = DocumentFormat.OpenXml.Spreadsheet;
@@ -43,7 +44,28 @@ namespace web.Infrastructure
             var sb = new StringBuilder();
             foreach (var page in pdf.GetPages())
             {
-                sb.AppendLine(page.Text);
+                // page.Text is PdfPig's simple built-in reconstruction and normally fine, but for some
+                // fonts/encodings it comes back empty even though the page demonstrably has glyphs on
+                // it (page.Letters is non-empty) — i.e. the text is selectable/readable in a real PDF
+                // viewer, just not recoverable by that particular heuristic. ContentOrderTextExtractor
+                // rebuilds the text directly from the page's letters in reading order and recovers
+                // content in exactly that case, so it's used as a fallback rather than the default —
+                // it's slower and less forgiving of layout, so only worth it when page.Text fails.
+                // Each page is isolated so one page's parser trouble (corrupt content stream, unusual
+                // Type3/embedded font, ...) doesn't blank out the whole (otherwise-fine) document.
+                string text;
+                try
+                {
+                    text = page.Text;
+                    if (string.IsNullOrWhiteSpace(text) && page.Letters.Count > 0)
+                        text = ContentOrderTextExtractor.GetText(page);
+                }
+                catch (Exception)
+                {
+                    text = string.Empty;
+                }
+
+                sb.AppendLine(text);
                 sb.AppendLine();
             }
             return sb.ToString();
