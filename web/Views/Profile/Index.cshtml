@@ -526,19 +526,21 @@
 
     <script>
         (() => {
-            // "Installer app" — only ever shown in the desktop shell. A page needs its own
-            // <link rel="manifest"> for the browser to consider IT installable, and only
-            // _AppShellLayout.cshtml links one (_Layout.cshtml is never touched) — so a native
-            // install prompt can only ever fire on an "/app/..." page, never here. Clicking the
-            // button below hands off to the PWA shell and asks it to trigger that prompt
-            // automatically on arrival (see the small script in _AppShellLayout.cshtml) — the
-            // installed app itself shows no install UI of its own.
+            // "Installer app" — only ever shown in the desktop shell; this same view renders inside
+            // the installed PWA shell too (see PwaShellMiddleware/_AppShellLayout.cshtml), which
+            // already links its own manifest, so the guard below skips all of this there.
+            //
+            // The card links the manifest and registers the service worker itself (manifest scope
+            // is "/", so it covers this page even though the installed app's own start_url is
+            // "/app/") — that's what lets the browser evaluate installability for THIS page
+            // directly, so the button can call prompt() straight away. No redirect through the PWA
+            // shell needed.
             const card = document.getElementById('pwaInstallCard');
             if (!card) return;
 
             const hasManifest = !!document.querySelector('link[rel="manifest"]');
             const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-            if (hasManifest || isStandalone) return; // inside (or already running as) the PWA shell
+            if (hasManifest || isStandalone) return; // inside (or already running as) the installed app
 
             const showState = (name) => {
                 card.classList.remove('d-none');
@@ -549,17 +551,40 @@
 
             const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) && !window.MSStream;
             if (isIOS) {
-                // Safari never supports an automatic install prompt - only the manual "Add to Home
-                // Screen" gesture.
+                // Safari never fires beforeinstallprompt — only the manual "Add to Home Screen" gesture.
                 showState('ios');
                 return;
             }
 
-            showState('button');
-            document.getElementById('pwaInstallBtn')?.addEventListener('click', () => {
-                // A query param survives an http->https scheme redirect (a different origin) on the
-                // way there — sessionStorage/a cookie set here would not.
-                location.href = '/app/Profile?installRequested=1';
+            const link = document.createElement('link');
+            link.rel = 'manifest';
+            link.href = '/manifest.webmanifest';
+            document.head.appendChild(link);
+
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => { /* installability just won't be offered */ });
+            }
+
+            // Button stays hidden (d-none, set in the markup) until the browser actually offers
+            // installation — there's nothing our own button can do before that happens.
+            let deferredPrompt = null;
+
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                showState('button');
+            });
+
+            window.addEventListener('appinstalled', () => {
+                card.classList.add('d-none');
+                window.FvToast?.show('success', @TJs("Follows er nu installeret."));
+            });
+
+            document.getElementById('pwaInstallBtn')?.addEventListener('click', async () => {
+                if (!deferredPrompt) return;
+                deferredPrompt.prompt();
+                await deferredPrompt.userChoice;
+                deferredPrompt = null; // can only be used once
             });
         })();
     </script>

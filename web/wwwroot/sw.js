@@ -1,10 +1,13 @@
-// Minimal service worker for the installable PWA shell (see _AppShellLayout.cshtml, which registers
-// this with { scope: '/app/' } so it can never intercept desktop-app requests).
+// Minimal service worker for the installable PWA. Registered from two places, at two different
+// scopes: _AppShellLayout.cshtml registers it with { scope: '/app/' } for the installed app shell
+// itself, and Profile/Index.cshtml registers it with { scope: '/' } so the desktop "Min Profil"
+// page is installable in its own right (lets the browser fire beforeinstallprompt there directly,
+// without a redirect through the PWA shell first). Both registrations point at this same file.
 //
-// Scope deliberately kept small: this precaches only the shell's own static assets and an offline
-// fallback page. It does NOT cache Feed/Documents/Profil HTML or JSON — that's all authenticated,
-// per-viewer, constantly-changing data; caching it for offline viewing is a meaningfully bigger
-// feature (cache invalidation, per-user storage) left for a later pass.
+// Precaching deliberately kept small: this only precaches the shell's own static assets and an
+// offline fallback page. It does NOT cache Feed/Documents/Profil HTML or JSON — that's all
+// authenticated, per-viewer, constantly-changing data; caching it for offline viewing is a
+// meaningfully bigger feature (cache invalidation, per-user storage) left for a later pass.
 
 const CACHE_NAME = 'follows-pwa-shell-v1';
 const OFFLINE_URL = '/offline.html';

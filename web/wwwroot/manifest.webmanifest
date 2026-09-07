@@ -3,7 +3,7 @@
   "short_name": "Follows",
   "description": "Feeds, dokumenter og profil fra Follows.",
   "start_url": "/app/",
-  "scope": "/app/",
+  "scope": "/",
   "id": "/app/",
   "display": "standalone",
   "orientation": "portrait-primary",
