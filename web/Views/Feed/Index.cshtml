@@ -287,8 +287,15 @@
             };
 
             fileInput.addEventListener('change', () => {
-                addFiles(Array.from(fileInput.files || []));
+                // Reset the native selection *before* addFiles() re-syncs fileInput.files from
+                // selectedFiles (via syncFileInput's DataTransfer trick) — resetting afterwards would
+                // wipe out that freshly-synced FileList again, so the previews looked right (they're
+                // built straight from the selectedFiles array) but the form actually submitted zero
+                // files. Resetting first is still needed so picking the exact same file again later
+                // fires a new change event.
+                const incoming = Array.from(fileInput.files || []);
                 fileInput.value = '';
+                addFiles(incoming);
             });
 
             cameraInput.addEventListener('change', () => {
